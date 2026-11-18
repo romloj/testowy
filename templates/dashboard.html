@@ -1,0 +1,1121 @@
+<!doctype html>
+<html lang="pl">
+<head>
+    <meta charset="utf-8">
+    <title>Centrum Dowodzenia - Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+
+    <style>
+        :root { --primary-gradient: linear-gradient(135deg, #4e73df, #224abe); }
+        body { background-color: #f3f4f6; padding-bottom: 180px; min-height: 100vh; font-family: 'Segoe UI', sans-serif; }
+        
+        .action-btn { 
+            height: 130px; 
+            border-radius: 15px; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            text-decoration: none; 
+            color: #5a5c69; 
+            font-weight: 700; 
+            background: white; 
+            border: 1px solid rgba(255,255,255,0.5); 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            position: relative; 
+            overflow: hidden; 
+            width: 100%;
+        }
+        .action-btn:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(78, 115, 223, 0.18); color: #4e73df; }
+        .action-btn i { font-size: 2.5rem; margin-bottom: 8px; transition: transform 0.3s; }
+        .action-btn:hover i { transform: scale(1.1); }
+
+        .shortcut-badge { position: absolute; top: 8px; right: 10px; font-size: 0.85rem; color: #ffc107; }
+        .custom-tag-badge { position: absolute; top: 8px; left: 10px; font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; background: rgba(13, 110, 253, 0.1); color: #0d6efd; font-weight: 600; text-transform: uppercase; }
+
+        .btn-delete-shortcut {
+            position: absolute;
+            bottom: 6px;
+            right: 8px;
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+        }
+        .action-btn:hover .btn-delete-shortcut { opacity: 1; }
+
+        .card-status { border: none; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow: hidden; height: 100%; }
+        .card-status .card-header { background: white; border-bottom: 1px solid #f0f0f0; padding: 15px; font-weight: 700; }
+        .avatar-circle { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 0.85rem; flex-shrink: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .list-group-item { border: none; border-bottom: 1px solid #f8f9fa; padding: 12px 15px; transition: background 0.2s; }
+        .list-group-item:hover { background-color: #fcfcfc; }
+        .cursor-pointer { cursor: pointer; }
+        
+        .tus-members-wrapper { display: none; margin-top: 4px; padding-top: 4px; border-top: 1px dashed rgba(13, 110, 253, 0.3); font-size: 0.8rem; color: #6c757d; }
+        .tus-members-list { margin: 0; padding-left: 14px; list-style-type: square; }
+        .list-group-item:hover .tus-members-wrapper { display: block; }
+        
+        .session-timer-box { background: white; padding: 8px 16px; border-radius: 50rem; font-size: 0.9rem; border: 1px solid #e3e6f0; color: #6c757d; display: flex; align-items: center; gap: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .session-timer-box.warning { color: #dc3545; border-color: #dc3545; animation: pulse-red 2s infinite; }
+        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(220,53,69,0.4); } 70% { box-shadow: 0 0 0 10px rgba(220,53,69,0); } 100% { box-shadow: 0 0 0 0 rgba(220,53,69,0); } }
+        
+        .assistant-container { position: fixed; bottom: 30px; right: 30px; z-index: 1080; display: flex; flex-direction: column; align-items: flex-end; pointer-events: none; }
+        .assistant-btn, .assistant-panel { pointer-events: auto; }
+        .assistant-btn { width: 65px; height: 65px; border-radius: 50%; background: var(--primary-gradient); color: white; border: 4px solid white; box-shadow: 0 5px 20px rgba(78, 115, 223, 0.4); display: flex; align-items: center; justify-content: center; font-size: 30px; cursor: pointer; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .assistant-btn:hover { transform: scale(1.1) rotate(10deg); }
+        .assistant-btn.active { background: #333; transform: rotate(45deg); border-color: #555; }
+        .assistant-panel { width: 380px; background: white; border-radius: 20px; margin-bottom: 20px; border: none; box-shadow: 0 15px 50px rgba(0,0,0,0.2); transform-origin: bottom right; transform: scale(0); opacity: 0; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); overflow: hidden; pointer-events: none; }
+        .assistant-panel.show { transform: scale(1); opacity: 1; pointer-events: auto; }
+        .chat-bubble-bot { max-width: 85%; background: var(--primary-gradient); color: white; padding: 10px 14px; border-radius: 15px; border-bottom-left-radius: 2px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 10px; font-size: 0.9rem; align-self: flex-start; }
+        .chat-bubble-user { max-width: 85%; background: #fff; color: #333; padding: 10px 14px; border-radius: 15px; border-bottom-right-radius: 2px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #eee; margin-bottom: 10px; font-size: 0.9rem; align-self: flex-end; }
+        .chat-quick-reply { cursor: pointer; border-radius: 50rem; padding: 6px 12px; font-size: 0.8rem; border: 1px solid #4e73df; color: #4e73df; background: #fff; transition: all 0.2s; white-space: nowrap; }
+        .chat-quick-reply:hover { background: #4e73df; color: #fff; }
+        
+        @media (max-width: 768px) { .assistant-container { bottom: 100px !important; right: 20px !important; } .assistant-btn { width: 55px; height: 55px; font-size: 24px; } body { padding-bottom: 220px; } }
+    </style>
+</head>
+<body>
+<script>
+    // Widoczne moduły wybrane przez użytkownika (klucze = data-module-id kafelków).
+    // Wstrzyknięte serwerowo przez context processor (visible_modules); JS odświeża przez /api/auth/modules.
+    window._visibleModuleIds = {{ visible_modules | tojson }};
+    window._allowedModuleIds = null;
+</script>
+<div class="container mt-3">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+</div>
+
+<div class="container py-4">
+    <div class="row align-items-center mb-4 g-3">
+        <div class="col-12 col-lg-5 text-center text-lg-start">
+            <h2 class="h3 mb-0 text-dark fw-bold ls-tight">Centrum Dowodzenia</h2>
+            <p class="text-muted small mb-0" id="currentDate">...</p>
+        </div>
+        <div class="col-12 col-lg-7">
+            <div class="d-flex gap-2 align-items-center justify-content-center justify-content-lg-end flex-wrap">
+                <div id="sessionTimerBox" class="session-timer-box" data-help="timer"><i class="bi bi-stopwatch-fill text-primary"></i><span id="sessionTimer" class="fw-bold font-monospace">15:00</span></div>
+                {% if current_user.is_admin or current_user.has_permission('manage_absences') %}<button class="btn btn-sm btn-warning fw-bold shadow-sm px-3 rounded-pill" onclick="window.openAbsenceModal()" data-help="l4"><i class="bi bi-bandaid-fill me-1"></i> L4/Urlop</button>{% endif %}
+                <button id="refreshBtn" onclick="loadDashboardData()" class="btn btn-sm btn-primary shadow-sm px-3 rounded-pill" data-help="refresh"><i class="bi bi-arrow-clockwise me-1"></i> Odśwież</button>
+                {% if current_user.is_admin %}
+                <div class="dropdown" data-help="admin">
+                    <button class="btn btn-dark dropdown-toggle btn-sm shadow-sm px-3 rounded-pill" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear-fill me-1"></i> Admin</button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
+                        <li><h6 class="dropdown-header text-uppercase small fw-bold">Konfiguracja</h6></li>
+                        <li><a class="dropdown-item rounded" href="{{ url_for('admin.manage_users_page') }}">👥 Role i Użytkownicy</a></li>
+                        <li><a class="dropdown-item rounded" href="{{ url_for('admin.zarzadzaj_firma_page') }}">🏢 Dane Firmy</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><h6 class="dropdown-header text-uppercase small fw-bold">Raporty</h6></li>
+                        <li><a class="dropdown-item rounded" href="{{ url_for('admin_absence_history') }}">🤒 Historia L4</a></li>
+                        <li><a class="dropdown-item rounded" href="{{ url_for('admin_drivers_page') }}">🚌 Logistyka</a></li>
+                        <li><a class="dropdown-item rounded" href="{{ url_for('admin_logs_page') }}">📜 Logi Systemowe</a></li>
+                    </ul>
+                </div>
+                {% endif %}
+                <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-danger shadow-sm px-3 rounded-pill" title="Wyloguj"><i class="bi bi-power"></i></a>
+            </div>
+        </div>
+    </div>
+
+    {% if current_user.is_admin or current_user.has_permission('dashboard_stats') %}
+    <div class="row mb-4">
+        <div class="col-12"><h6 class="text-uppercase text-secondary fw-bold mb-3 small ls-1"><i class="bi bi-person-badge me-2"></i>Terapeuci</h6></div>
+        <div class="col-lg-4 mb-3"><div class="card card-status" data-help="therapists-busy"><div class="card-header text-primary d-flex justify-content-between"><span>Zajęci</span> <span class="badge bg-primary-subtle text-primary rounded-pill" id="busyCount">0</span></div><div class="card-body p-0"><div id="busyList" class="list-group list-group-flush small overflow-auto" style="max-height:250px"></div></div></div></div>
+        <div class="col-lg-4 mb-3"><div class="card card-status" data-help="therapists-free"><div class="card-header text-success d-flex justify-content-between"><span>Dostępni</span> <span class="badge bg-success-subtle text-success rounded-pill" id="freeCount">0</span></div><div class="card-body p-0"><div id="freeList" class="list-group list-group-flush small overflow-auto" style="max-height:250px"></div></div></div></div>
+        <div class="col-lg-4 mb-3"><div class="card card-status" data-help="therapists-absent"><div class="card-header text-danger d-flex justify-content-between"><span title="Nieobecności zaplanowane w aktualnym miesiącu">Nieobecni (Miesiąc)</span> <span class="badge bg-danger-subtle text-danger rounded-pill" id="absentCount">0</span></div><div class="card-body p-0"><div id="absentList" class="list-group list-group-flush small overflow-auto" style="max-height:250px"></div></div></div></div>
+    </div>
+    <div class="row mb-4">
+        <div class="col-12"><h6 class="text-uppercase text-secondary fw-bold mb-3 small ls-1"><i class="bi bi-truck me-2"></i>Logistyka (Kierowcy)</h6></div>
+        <div class="col-lg-4 mb-3"><div class="card card-status" data-help="drivers-busy"><div class="card-header text-warning-emphasis d-flex justify-content-between"><span>W trasie</span> <span class="badge bg-warning-subtle text-warning-emphasis rounded-pill" id="driverBusyCount">0</span></div><div class="card-body p-0"><div id="driverBusyList" class="list-group list-group-flush small overflow-auto" style="max-height:250px"></div></div></div></div>
+        <div class="col-lg-4 mb-3"><div class="card card-status"><div class="card-header text-secondary d-flex justify-content-between"><span>Wolni</span> <span class="badge bg-secondary-subtle text-secondary rounded-pill" id="driverFreeCount">0</span></div><div class="card-body p-0"><div id="driverFreeList" class="list-group list-group-flush small overflow-auto" style="max-height:250px"></div></div></div></div>
+        <div class="col-lg-4 mb-3"><div class="card card-status"><div class="card-header text-danger d-flex justify-content-between"><span title="Nieobecności zaplanowane w aktualnym miesiącu">Nieobecni (Miesiąc)</span> <span class="badge bg-danger-subtle text-danger rounded-pill" id="driverAbsentCount">0</span></div><div class="card-body p-0"><div id="driverAbsentList" class="list-group list-group-flush small overflow-auto" style="max-height:250px"></div></div></div></div>
+    </div>
+    {% endif %}
+
+    <!-- SEKCJA MOJE SKRÓTY -->
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h6 class="text-uppercase text-secondary fw-bold mb-0 small ls-1"><i class="bi bi-star-fill text-warning me-2"></i>Moje Skróty (Szybki Dostęp)</h6>
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold shadow-sm" onclick="window.openCustomizeShortcutsModal()">
+                <i class="bi bi-sliders me-1"></i> Wybierz skróty (Strony & Moduły)
+            </button>
+            <button class="btn btn-sm btn-outline-dark rounded-pill px-3 fw-bold shadow-sm" onclick="window.openModulesModal()" title="Wybierz tylko te moduły, których używasz — pozostałe będą ukryte">
+                <i class="bi bi-grid-3x3-gap me-1"></i> Wybierz moduły
+            </button>
+        </div>
+    </div>
+
+    <!-- PAKIET KAFLI SKRÓTÓW -->
+    <div class="row g-3 mb-4" id="customShortcutsContainer">
+        <!-- Renderowane dynamicznie w JS z wypróbowanych stron i skrótów -->
+    </div>
+
+    <!-- SEKCJA WSZYSTKIE APLIKACJE (Ukrywana, gdy wszystkie kafelki trafią do skrótów) -->
+    <div id="allApplicationsSection">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="text-uppercase text-secondary fw-bold mb-0 small ls-1"><i class="bi bi-grid-fill me-2"></i>Pozostałe Aplikacje</h6>
+        </div>
+        <div class="row g-3 mb-4" id="allApplicationsContainer">
+            {% if current_user.is_admin or current_user.has_permission('clients') %}<div class="col-6 col-md-3 app-tile" data-module-id="clients"><a href="{{ url_for('klient_panel') }}" class="action-btn" data-help="tile-clients"><i class="bi bi-people-fill text-primary"></i><span>Klienci</span></a></div>{% endif %}
+            {% if current_user.is_admin or current_user.has_permission('suo') %}<div class="col-6 col-md-3 app-tile" data-module-id="suo"><a href="{{ url_for('panel') }}" class="action-btn" data-help="tile-suo"><i class="bi bi-cash-coin text-warning"></i><span>Panel SUO</span></a></div>{% endif %}
+            {% if current_user.is_admin or current_user.has_permission('calendar') %}<div class="col-6 col-md-3 app-tile" data-module-id="calendar"><a href="{{ url_for('client_panel_grafik') }}" class="action-btn" data-help="tile-calendar"><i class="bi bi-calendar-check text-success"></i><span>Grafik</span></a></div>{% endif %}
+            {% if current_user.is_admin or current_user.has_permission('drivers') %}<div class="col-6 col-md-3 app-tile" data-module-id="drivers"><a href="{{ url_for('driver_schedule_page') }}" class="action-btn" data-help="tile-drivers"><i class="bi bi-car-front-fill text-info"></i><span>Kierowcy</span></a></div>{% endif %}
+            {% if current_user.is_admin or current_user.has_permission('tus') %}<div class="col-6 col-md-3 app-tile" data-module-id="tus"><a href="{{ url_for('tus_page') }}" class="action-btn" data-help="tile-tus"><i class="bi bi-puzzle-fill" style="color: #6610f2;"></i><span>Grupy TUS</span></a></div>{% endif %}
+            {% if current_user.is_admin or current_user.has_permission('planer_masowy') %}<div class="col-6 col-md-3 app-tile" data-module-id="planer_masowy"><a href="{{ url_for('mass_planner_page') }}" class="action-btn" data-help="tile-planer"><i class="bi bi-stars" style="color: #6610f2;"></i><span>Planer AI</span></a></div>{% endif %}
+            {% if current_user.is_admin or current_user.has_permission('manager') %}<div class="col-6 col-md-3 app-tile" data-module-id="manager"><a href="{{ url_for('manager_page') }}" class="action-btn" data-help="tile-manager"><i class="bi bi-briefcase-fill text-secondary"></i><span>Manager</span></a></div>{% endif %}
+            {% if current_user.is_admin or current_user.has_permission('therapist') %}<div class="col-6 col-md-3 app-tile" data-module-id="therapist"><a href="{{ url_for('terapeuta_panel') }}" class="action-btn" data-help="tile-therapist"><i class="bi bi-heart-pulse-fill text-danger"></i><span>Mój Panel</span></a></div>{% endif %}
+        </div>
+    </div>
+
+    <div class="text-center mt-5 text-muted small">&copy; 2026 System Zarządzania Terapią v3.2</div>
+</div>
+
+<!-- Modal Wyboru Skrótów z Polami Checkbox dla Wszystkich Stron -->
+<div class="modal fade" id="shortcutsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white py-2">
+                <h5 class="modal-title fs-6 fw-bold"><i class="bi bi-sliders me-2"></i>Wybierz Skróty na Pulpit</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">
+                    Zaznacz pola przy stronach i modułach, do których chcesz mieć szybki dostęp w sekcji <strong>„Moje Skróty”</strong> na pulpicie.
+                </p>
+                
+                <div class="mb-3">
+                    <input type="text" id="shortcutSearchInput" class="form-control form-control-sm" placeholder="🔍 Szukaj podstrony..." onkeyup="window.filterShortcutsModal()">
+                </div>
+
+                <div class="overflow-auto pe-1" style="max-height: 400px;" id="shortcutsCheckboxesContainer">
+                    <!-- Wyrenderowane dynamicznie klastry checkboxów po kategoriach -->
+                </div>
+
+                <div class="mt-3 pt-3 border-top">
+                    <button class="btn btn-sm btn-link text-decoration-none p-0 text-primary fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#customUrlCollapse">
+                        <i class="bi bi-plus-circle me-1"></i> Dodaj inny (własny adres URL)
+                    </button>
+                    <div class="collapse mt-2 p-3 bg-light rounded border" id="customUrlCollapse">
+                        <div class="row g-2">
+                            <div class="col-md-5">
+                                <label class="form-label small fw-bold mb-1">Nazwa</label>
+                                <input type="text" id="customShortcutTitle" class="form-control form-control-sm" placeholder="np. Zewnętrzny Raport">
+                            </div>
+                            <div class="col-md-7">
+                                <label class="form-label small fw-bold mb-1">Adres URL</label>
+                                <input type="text" id="customShortcutUrl" class="form-control form-control-sm" placeholder="np. /specjalny-link">
+                            </div>
+                            <div class="col-12 text-end mt-2">
+                                <button type="button" class="btn btn-sm btn-success fw-bold px-3" onclick="window.addManualCustomShortcut()">Dodaj własny link</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer py-2 bg-light d-flex justify-content-between">
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.resetUserPreferences()">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i> Przywróć domyślne
+                </button>
+                <div>
+                    <button type="button" class="btn btn-sm btn-secondary me-2" data-bs-dismiss="modal">Anuluj</button>
+                    <button type="button" class="btn btn-sm btn-primary fw-bold px-4" onclick="window.saveUserPreferences()">Zapisz skróty</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Wyboru Widocznych Modułów (pozostałe są ukrywane na pulpicie) -->
+<div class="modal fade" id="modulesModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white py-2">
+                <h5 class="modal-title fs-6 fw-bold"><i class="bi bi-grid-3x3-gap-fill me-2"></i>Wybierz widoczne moduły</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">
+                    Zaznacz moduły, których najczęściej używasz w bieżącej pracy — tylko one będą widoczne na pulpicie.
+                    Pozostałe zostaną ukryte; w każdej chwili możesz je tu ponownie włączyć lub kliknąć <strong>„Przywróć wszystkie”</strong>.
+                </p>
+                <div class="mb-3">
+                    <input type="text" id="moduleSearchInput" class="form-control form-control-sm" placeholder="Szukaj modułu..." onkeyup="window.filterModulesModal()">
+                </div>
+                <div class="overflow-auto pe-1" style="max-height: 400px;" id="modulesCheckboxesContainer">
+                    <!-- Wyrenderowane dynamicznie z ALL_SYSTEM_PAGES -->
+                </div>
+            </div>
+            <div class="modal-footer py-2 bg-light d-flex justify-content-between">
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.resetVisibleModules()">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i> Przywróć wszystkie
+                </button>
+                <div>
+                    <button type="button" class="btn btn-sm btn-secondary me-2" data-bs-dismiss="modal">Anuluj</button>
+                    <button type="button" class="btn btn-sm btn-dark fw-bold px-4" onclick="window.saveVisibleModules()">Zapisz moduły</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="absenceModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header bg-warning-subtle"><h5 class="modal-title fw-bold"><i class="bi bi-bandaid-fill me-2"></i>Zgłoś Nieobecność</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="absenceForm"><div id="adminSelectionArea" class="mb-3" style="display: none;"><label class="form-label small fw-bold text-muted">ROLA</label><div class="btn-group w-100 mb-3" role="group"><input type="radio" class="btn-check" name="personType" id="roleTherapist" value="therapist" checked onchange="window.loadPersonList('therapist')"><label class="btn btn-outline-primary" for="roleTherapist">Terapeuta</label><input type="radio" class="btn-check" name="personType" id="roleDriver" value="driver" onchange="window.loadPersonList('driver')"><label class="btn btn-outline-primary" for="roleDriver">Kierowca</label></div><label class="form-label small fw-bold text-muted">PRACOWNIK</label><select class="form-select" id="absPersonId" style="width:100%"></select></div><div id="userSelectionInfo" class="alert alert-info small" style="display: none;"><i class="bi bi-info-circle-fill me-2"></i> Zgłaszasz nieobecność dla: <strong><span id="userDisplayName">Ja</span></strong></div><div class="mb-3"><label class="form-label small fw-bold text-muted">POWÓD</label><select class="form-select" id="absReason" required><option value="L4">Chorobowe (L4)</option><option value="Urlop">Urlop Wypoczynkowy</option><option value="Opieka">Opieka nad dzieckiem</option><option value="Szkolenie">Szkolenie</option><option value="Inne">Inne</option></select></div><div class="row g-2"><div class="col-6"><label class="form-label small fw-bold text-muted">OD</label><input type="date" class="form-control" id="absStart" required></div><div class="col-6"><label class="form-label small fw-bold text-muted">DO</label><input type="date" class="form-control" id="absEnd" required></div></div><div class="d-grid mt-4"><button type="submit" class="btn btn-dark fw-bold">Zatwierdź</button></div></form></div></div></div></div>
+
+<div class="modal fade" id="editDashboardSlotModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-light py-2">
+                <h5 class="modal-title fs-6 fw-bold text-uppercase">Edycja Zadania</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="dashSlotId">
+
+                <div class="mb-3 text-center">
+                    <h5 id="dashClientName" class="fw-bold text-primary mb-0"></h5>
+                    <small class="text-muted" id="dashSlotType">Wizyta</small>
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label small fw-bold">Terapeuta</label>
+                    <select id="dashTherapistSelect" class="form-select form-select-sm"></select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Kierowca</label>
+                    <select id="dashDriverSelect" class="form-select form-select-sm"></select>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small fw-bold">Godzina Od</label>
+                        <input type="time" id="dashStartTime" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-bold">Godzina Do</label>
+                        <input type="time" id="dashEndTime" class="form-control form-control-sm">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Status</label>
+                    <select id="dashStatus" class="form-select form-select-sm">
+                        <option value="planned">Zaplanowana</option>
+                        <option value="done">Zrealizowana</option>
+                        <option value="cancelled">Odwołana</option>
+                    </select>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button class="btn btn-primary btn-sm" onclick="window.saveDashboardSlotChanges()">Zapisz zmiany</button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="window.deleteDashboardSlot()"><i class="bi bi-trash me-2"></i>Usuń</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="sessionWarningModal" data-bs-backdrop="static" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content border-danger shadow-lg"><div class="modal-body text-center py-4"><i class="bi bi-alarm-fill text-danger display-4 mb-3"></i><h5 class="fw-bold">Sesja wygasa!</h5><p class="text-muted small">Wylogowanie nastąpi za:</p><div class="display-6 fw-bold text-danger font-monospace" id="modalTimer">00:00</div><div class="d-flex gap-2 justify-content-center mt-4"><button class="btn btn-outline-secondary btn-sm" onclick="location.href='{{ url_for('auth.logout') }}'">Wyloguj</button><button class="btn btn-danger btn-sm px-4 fw-bold" onclick="window.extendSession()">Przedłuż</button></div></div></div></div></div>
+
+<div class="assistant-container">
+    <div id="assistantPanel" class="assistant-panel">
+        <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+            <h6 class="m-0 fw-bold text-primary"><i class="bi bi-robot me-2"></i>Przewodnik po systemie</h6>
+            <button class="btn-close btn-sm" onclick="window.toggleAssistant()"></button>
+        </div>
+        <div class="p-3 d-flex flex-column" style="height: 450px; background-color: #f8f9fa;">
+            
+            <div id="chatHistory" class="flex-grow-1 overflow-auto mb-2 d-flex flex-column gap-2 pe-1">
+                <div class="chat-bubble-bot shadow-sm border-0">
+                    Cześć! 😊 Widzę, że nasz system ma wiele funkcji. Nie musisz szukać wszystkiego na własną rękę – użyj czatu poniżej, a ja wskażę Ci, gdzie kliknąć!
+                </div>
+                
+                <div class="chat-bubble-bot shadow-sm border-0 mt-1" style="background: white; color: #333; border: 1px solid #4e73df !important; border-left: 5px solid #4e73df !important;">
+                    <strong><i class="bi bi-mic-fill text-primary"></i> Sterowanie Głosowe</strong><br>
+                    <span class="small text-muted mb-2 d-block">Kliknij ikonę mikrofonu i powiedz jedną z komend, a ja natychmiast to zrobię:</span>
+                    
+                    <ul class="small ps-3 mb-1 text-dark" style="line-height: 1.4;">
+                        <li><strong>"Otwórz..."</strong> (np. panel klienta, grafik, dziennik, logistykę, TUS)</li>
+                        <li><strong>"Nowa grupa"</strong> / <strong>"Dodaj grupę"</strong> (w module TUS)</li>
+                        <li><strong>"Dodaj klienta"</strong> / <strong>"Nowy klient"</strong></li>
+                        <li><strong>"Baza tematów / zachowań"</strong> (w module TUS)</li>
+                        <li><strong>"Zamknij / Anuluj"</strong> (zamyka otwarte okienka)</li>
+                        <li><strong>"Wyloguj"</strong></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-1 mb-3 pt-2 border-top" id="quickQuestions">
+                <span class="chat-quick-reply" onclick="askAssistant('Jak dodać nowego klienta?')">Nowy klient</span>
+                <span class="chat-quick-reply" onclick="askAssistant('Jak używać poleceń głosowych?')"><i class="bi bi-mic-fill"></i> Polecenia głosowe</span>
+                <span class="chat-quick-reply" onclick="askAssistant('Jak dodać urlop / L4?')">L4/Urlop</span>
+            </div>
+
+            <div class="input-group mt-auto">
+                <input type="text" id="assistantInput" class="form-control bg-white" placeholder="Napisz pytanie..." onkeypress="if(event.key === 'Enter') sendAssistantMessage()">
+                <button class="btn btn-primary" onclick="sendAssistantMessage()"><i class="bi bi-send-fill"></i></button>
+            </div>
+        </div>
+    </div>
+    <div class="assistant-btn" onclick="window.toggleAssistant()" title="Potrzebujesz pomocy?">
+        <i class="bi bi-robot"></i>
+    </div>
+</div>
+
+{% include 'voice_assistant.html' %}
+
+{% if is_admin and session.get('username') == 'admin' %}
+<div class="container mb-3">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-danger">
+                <div class="card-body text-center">
+                    <i class="bi bi-building-gear text-danger" style="font-size: 2.5rem;"></i>
+                    <h5 class="card-title mt-2 fw-bold text-danger">Centrala SaaS (Super Admin)</h5>
+                    <p class="card-text text-muted small">Globalny rejestr podmiotów, tworzenie nowych fundacji i monitoring zużycia baz danych.</p>
+                    <a href="/admin/super-panel-saas" class="btn btn-danger fw-bold w-100">Otwórz Konsolę SaaS</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+    const CURRENT_USER = {
+        isAdmin: "{{ 'true' if is_admin else 'false' }}" === "true",
+        canManageAbsences: "{{ 'true' if is_admin or is_secretariat or (current_user and current_user.has_permission and current_user.has_permission('manage_absences')) else 'false' }}" === "true",
+        therapistId: parseInt("{{ therapist_id if therapist_id is not none else '' }}", 10) || null,
+        driverId: parseInt("{{ driver_id if driver_id is not none else '' }}", 10) || null,
+        fullName: "{{ current_user.full_name if current_user and current_user.full_name else 'Użytkownik' }}"
+    };
+
+    let _dashboardData = null;
+    let _allTherapists = [];
+    let _allDrivers = [];
+    
+    let timeLeft = 900; 
+    let warningModalInstance = null;
+
+    function esc(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/\"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    const SHORTCUTS_STORAGE_KEY = `dashboard_shortcuts_selected_${CURRENT_USER.fullName.replace(/\s+/g, '_')}`;
+    const CUSTOM_URL_SHORTCUTS_KEY = `dashboard_custom_urls_${CURRENT_USER.fullName.replace(/\s+/g, '_')}`;
+
+    // KOMPLETNY KATALOG WSZYSTKICH PODSTRON I MODUŁÓW SYSTEMU Z PODZIAŁEM NA KATEGORIE
+    const ALL_SYSTEM_PAGES = [
+        {
+            category: "Główne Moduły Aplikacji",
+            items: [
+                { id: 'clients', title: 'Klienci (Lista Główna)', icon: 'bi-people-fill', color: 'text-primary', url: "{{ url_for('klient_panel') }}" },
+                { id: 'suo', title: 'Panel SUO', icon: 'bi-cash-coin', color: 'text-warning', url: "{{ url_for('panel') }}" },
+                { id: 'calendar', title: 'Grafik Wizyt', icon: 'bi-calendar-check', color: 'text-success', url: "{{ url_for('client_panel_grafik') }}" },
+                { id: 'drivers', title: 'Kierowcy (Logistyka)', icon: 'bi-car-front-fill', color: 'text-info', url: "{{ url_for('driver_schedule_page') }}" },
+                { id: 'tus', title: 'Grupy TUS', icon: 'bi-puzzle-fill', style: 'color: #6610f2;', url: "{{ url_for('tus_page') }}" },
+                { id: 'planer_masowy', title: 'Planer Masowy AI', icon: 'bi-stars', style: 'color: #6610f2;', url: "{{ url_for('mass_planner_page') }}" },
+                { id: 'manager', title: 'Manager (Główny)', icon: 'bi-briefcase-fill', color: 'text-secondary', url: "{{ url_for('manager_page') }}" },
+                { id: 'therapist', title: 'Mój Panel Terapeuty', icon: 'bi-heart-pulse-fill', color: 'text-danger', url: "{{ url_for('terapeuta_panel') }}" }
+            ]
+        },
+        {
+            category: "Dziennik & Obsługa Pacjentów",
+            items: [
+                { id: 'poczekalnia', title: 'Poczekalnia Pacjentów', icon: 'bi-hourglass-split', color: 'text-warning', url: '/poczekalnia' },
+                { id: 'dziennik', title: 'Dziennik Główny', icon: 'bi-journal-check', color: 'text-primary', url: '/klient_panel/dziennik' },
+                { id: 'lista_zestawienie', title: 'Zestawienie Dziennika', icon: 'bi-card-checklist', color: 'text-info', url: '/klient_panel/lista_zestawienie' },
+                { id: 'historia', title: 'Historia Pacjentów', icon: 'bi-clock-history', color: 'text-secondary', url: '/klient_panel/historia' },
+                { id: 'notes', title: 'Notatki Pacjentów', icon: 'bi-sticky-fill', color: 'text-warning', url: '/klient_panel/notes' },
+                { id: 'attendance', title: 'Obecność Indywidualna', icon: 'bi-check-circle-fill', color: 'text-success', url: '/klient_panel/indywidual-attendance' }
+            ]
+        },
+        {
+            category: "Manager, Dokumenty & Finanse",
+            items: [
+                { id: 'admission', title: 'Karta Przyjęcia (Wywiad)', icon: 'bi-file-person', color: 'text-primary', url: '/manager/admission' },
+                { id: 'planer_ind', title: 'Planer Indywidualny', icon: 'bi-calendar-event', color: 'text-success', url: '/manager/planer-indywidualny' },
+                { id: 'plany_lista', title: 'Plany Terapeutyczne', icon: 'bi-journal-medical', color: 'text-primary', url: '/manager/plany-lista' },
+                { id: 'ipet', title: 'Dokumenty IPET', icon: 'bi-file-earmark-medical', color: 'text-danger', url: '/manager/ipet' },
+                { id: 'finanse', title: 'Finanse & Wpłaty', icon: 'bi-cash-stack', color: 'text-success', url: '/manager/finanse' },
+                { id: 'sprawozdania', title: 'Sprawozdania Okresowe', icon: 'bi-file-earmark-bar-graph', color: 'text-info', url: '/manager/sprawozdania' },
+                { id: 'uchwaly', title: 'Uchwały Zarządu', icon: 'bi-file-earmark-text-fill', color: 'text-dark', url: '/manager/uchwaly' },
+                { id: 'projects', title: 'Projekty Unijne', icon: 'bi-folder-fill', color: 'text-primary', url: '/manager/projects' },
+                { id: 'diagnozy', title: 'Baza Diagnoz', icon: 'bi-clipboard2-pulse', color: 'text-danger', url: '/manager/diagnoza_list' },
+                { id: 'diva5', title: 'Raporty DIVA-5', icon: 'bi-file-earmark-pdf-fill', color: 'text-danger', url: '/manager/diva5-raporty' }
+            ]
+        }
+    ];
+
+    function getAllFlatPages() {
+        const flat = [];
+        ALL_SYSTEM_PAGES.forEach(cat => {
+            cat.items.forEach(item => flat.push(item));
+        });
+        return flat;
+    }
+
+    // Czy moduł jest widoczny wg wyboru użytkownika (null/brak = wszystkie widoczne)
+    function isModuleVisible(moduleId) {
+        if (!moduleId) return true;
+        return !Array.isArray(window._visibleModuleIds) || window._visibleModuleIds.includes(moduleId);
+    }
+
+    function getCustomUrlShortcuts() {
+        try {
+            const raw = localStorage.getItem(CUSTOM_URL_SHORTCUTS_KEY);
+            if (raw) return JSON.parse(raw);
+        } catch(e) {}
+        return [];
+    }
+
+    function saveCustomUrlShortcuts(list) {
+        localStorage.setItem(CUSTOM_URL_SHORTCUTS_KEY, JSON.stringify(list));
+    }
+
+    function loadUserPreferences() {
+        const flatPages = getAllFlatPages();
+        const customUrls = getCustomUrlShortcuts();
+
+        let selectedIds = null;
+        try {
+            const raw = localStorage.getItem(SHORTCUTS_STORAGE_KEY);
+            if (raw) selectedIds = JSON.parse(raw);
+        } catch(e) {}
+
+        // Domyślnie przypinamy pierwsze 4 podstrony
+        if (!selectedIds || !Array.isArray(selectedIds)) {
+            selectedIds = ['clients', 'calendar', 'dziennik', 'poczekalnia'];
+        }
+
+        renderUserShortcuts(selectedIds, flatPages, customUrls);
+    }
+
+    function renderUserShortcuts(selectedIds, flatPages, customUrls) {
+        const container = document.getElementById('customShortcutsContainer');
+        container.innerHTML = '';
+
+        const activePages = flatPages.filter(p => selectedIds.includes(p.id) && isModuleVisible(p.id));
+
+        // Renderujemy wbudowane strony wybrane z checklisty
+        activePages.forEach(p => {
+            const styleAttr = p.style ? `style="${p.style}"` : '';
+            const col = document.createElement('div');
+            col.className = 'col-6 col-md-3';
+            col.innerHTML = `
+                <a href="${p.url}" class="action-btn">
+                    <i class="bi ${p.icon} ${p.color || ''}" ${styleAttr}></i>
+                    <span class="text-truncate px-2 w-100 text-center">${esc(p.title)}</span>
+                    <i class="bi bi-star-fill shortcut-badge"></i>
+                </a>`;
+            container.appendChild(col);
+        });
+
+        // Renderujemy opcjonalne własne linki URL
+        customUrls.forEach(item => {
+            const col = document.createElement('div');
+            col.className = 'col-6 col-md-3';
+            col.innerHTML = `
+                <a href="${esc(item.url)}" class="action-btn">
+                    <span class="custom-tag-badge"><i class="bi bi-link-45deg me-1"></i>Skrót</span>
+                    <i class="bi ${item.icon || 'bi-bookmark-star-fill'} ${item.color || 'text-primary'}"></i>
+                    <span class="text-truncate px-2 w-100 text-center">${esc(item.title)}</span>
+                    <i class="bi bi-star-fill shortcut-badge text-warning"></i>
+                    <button class="btn btn-sm btn-danger btn-delete-shortcut" onclick="window.removeCustomUrlShortcut(event, '${item.id}')" title="Usuń ten skrót">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </a>`;
+            container.appendChild(col);
+        });
+
+        if (activePages.length === 0 && customUrls.length === 0) {
+            container.innerHTML = `
+                <div class="col-12 text-center py-4 text-muted bg-white rounded-3 shadow-sm border">
+                    <i class="bi bi-star text-secondary fs-3 d-block mb-1"></i>
+                    Brak przypiętych skrótów. Kliknij <strong>„Wybierz skróty”</strong> powyżej, aby zaznaczyć najważniejsze dla Ciebie podstrony.
+                </div>`;
+        }
+
+        // --- DYNAMICZNE UKRYWANIE PRZYPIĘTYCH MODUŁÓW Z DOLNEJ LISTY ---
+        const appTiles = document.querySelectorAll('.app-tile');
+        let remainingVisibleCount = 0;
+
+        appTiles.forEach(tile => {
+            const modId = tile.getAttribute('data-module-id');
+            const tileLink = tile.querySelector('a')?.getAttribute('href');
+
+            // Moduł celowo ukryty przez użytkownika (wybór widocznych modułów)
+            const moduleHidden = !isModuleVisible(modId);
+
+            // Jeśli moduł jest w przypiętych skrótach (po ID lub URL), ukrywamy go z głównej listy
+            const isPinned = selectedIds.includes(modId) || customUrls.some(c => c.url === tileLink);
+
+            if (isPinned || moduleHidden) {
+                tile.style.display = 'none';
+            } else {
+                tile.style.display = '';
+                remainingVisibleCount++;
+            }
+        });
+
+        // Ukrywanie/pokazywanie sekcji "Pozostałe Aplikacje", jeśli wszystkie kafle są przypięte wyżej
+        const allAppsSection = document.getElementById('allApplicationsSection');
+        if (allAppsSection) {
+            allAppsSection.style.display = (remainingVisibleCount === 0) ? 'none' : '';
+        }
+    }
+
+    window.removeCustomUrlShortcut = function(event, shortcutId) {
+        event.preventDefault();
+        event.stopPropagation();
+        let list = getCustomUrlShortcuts();
+        list = list.filter(i => i.id !== shortcutId);
+        saveCustomUrlShortcuts(list);
+        loadUserPreferences();
+    };
+
+    window.openCustomizeShortcutsModal = function() {
+        let selectedIds = [];
+        try {
+            const raw = localStorage.getItem(SHORTCUTS_STORAGE_KEY);
+            if (raw) selectedIds = JSON.parse(raw);
+        } catch(e) {}
+
+        if (!selectedIds || selectedIds.length === 0) {
+            selectedIds = ['clients', 'calendar', 'dziennik', 'poczekalnia'];
+        }
+
+        const container = document.getElementById('shortcutsCheckboxesContainer');
+        container.innerHTML = '';
+
+        ALL_SYSTEM_PAGES.forEach((group, gIdx) => {
+            let itemsHtml = '';
+            group.items.forEach(p => {
+                if (!isModuleVisible(p.id)) return; // ukryte moduły nie pokazują się też na liście skrótów
+                const isChecked = selectedIds.includes(p.id) ? 'checked' : '';
+                const styleAttr = p.style ? `style="${p.style}"` : '';
+                itemsHtml += `
+                    <div class="col-md-6 shortcut-checkbox-item">
+                        <div class="form-check p-2 border rounded bg-white shadow-sm d-flex align-items-center mb-1">
+                            <input class="form-check-input me-3 ms-1 shortcut-page-checkbox" type="checkbox" value="${p.id}" id="page_chk_${p.id}" ${isChecked}>
+                            <label class="form-check-label w-100 cursor-pointer d-flex align-items-center text-dark fw-semibold small" for="page_chk_${p.id}">
+                                <i class="bi ${p.icon} fs-5 me-2 ${p.color || ''}" ${styleAttr}></i>
+                                <span class="text-truncate">${esc(p.title)}</span>
+                            </label>
+                        </div>
+                    </div>`;
+            });
+
+            container.innerHTML += `
+                <div class="shortcut-category-group mb-3">
+                    <h6 class="fw-bold text-primary small text-uppercase mb-2 border-bottom pb-1">${group.category}</h6>
+                    <div class="row g-2">
+                        ${itemsHtml}
+                    </div>
+                </div>`;
+        });
+
+        document.getElementById('shortcutSearchInput').value = '';
+        new bootstrap.Modal(document.getElementById('shortcutsModal')).show();
+    };
+
+    window.filterShortcutsModal = function() {
+        const query = document.getElementById('shortcutSearchInput').value.toLowerCase().trim();
+        document.querySelectorAll('.shortcut-checkbox-item').forEach(item => {
+            const txt = item.textContent.toLowerCase();
+            item.style.display = txt.includes(query) ? 'block' : 'none';
+        });
+        document.querySelectorAll('.shortcut-category-group').forEach(group => {
+            const anyVisible = Array.from(group.querySelectorAll('.shortcut-checkbox-item')).some(i => i.style.display !== 'none');
+            group.style.display = anyVisible ? '' : 'none';
+        });
+    };
+
+    window.addManualCustomShortcut = function() {
+        const title = document.getElementById('customShortcutTitle').value.trim();
+        const url = document.getElementById('customShortcutUrl').value.trim();
+
+        if (!title || !url) {
+            alert("Podaj nazwę i adres URL!");
+            return;
+        }
+
+        const list = getCustomUrlShortcuts();
+        list.push({
+            id: `custom_${Date.now()}`,
+            title: title,
+            url: url,
+            icon: 'bi-bookmark-star-fill',
+            color: 'text-primary'
+        });
+
+        saveCustomUrlShortcuts(list);
+        document.getElementById('customShortcutTitle').value = '';
+        document.getElementById('customShortcutUrl').value = '';
+        bootstrap.Collapse.getInstance(document.getElementById('customUrlCollapse'))?.hide();
+
+        loadUserPreferences();
+    };
+
+    window.saveUserPreferences = function() {
+        const selectedIds = [];
+        document.querySelectorAll('.shortcut-page-checkbox:checked').forEach(chk => {
+            selectedIds.push(chk.value);
+        });
+
+        localStorage.setItem(SHORTCUTS_STORAGE_KEY, JSON.stringify(selectedIds));
+        bootstrap.Modal.getInstance(document.getElementById('shortcutsModal')).hide();
+        loadUserPreferences();
+    };
+
+    window.resetUserPreferences = function() {
+        localStorage.removeItem(SHORTCUTS_STORAGE_KEY);
+        localStorage.removeItem(CUSTOM_URL_SHORTCUTS_KEY);
+        bootstrap.Modal.getInstance(document.getElementById('shortcutsModal')).hide();
+        loadUserPreferences();
+    };
+
+    // === WIDOCZNE MODUŁY — wybór użytkownika zapisywany na serwerze (/api/auth/modules) ===
+
+    async function loadModuleVisibility() {
+        try {
+            const res = await fetch('/api/auth/modules');
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data.visible)) window._visibleModuleIds = data.visible;
+                if (Array.isArray(data.allowed)) window._allowedModuleIds = data.allowed;
+            }
+        } catch(e) { console.error("Błąd pobierania widocznych modułów:", e); }
+    }
+
+    window.openModulesModal = function() {
+        const container = document.getElementById('modulesCheckboxesContainer');
+        container.innerHTML = '';
+
+        const visible = Array.isArray(window._visibleModuleIds) ? window._visibleModuleIds : getAllFlatPages().map(p => p.id);
+        // null = nie pobrano jeszcze / admin -> wszystko można zaznaczyć
+        const allowed = Array.isArray(window._allowedModuleIds) ? window._allowedModuleIds : null;
+
+        ALL_SYSTEM_PAGES.forEach(group => {
+            let itemsHtml = '';
+            group.items.forEach(p => {
+                const isChecked = visible.includes(p.id) ? 'checked' : '';
+                const isAllowed = allowed === null || allowed.includes(p.id);
+                const disabledAttr = isAllowed ? '' : 'disabled title="Brak uprawnień do tego modułu"';
+                const styleAttr = p.style ? `style="${p.style}"` : '';
+                itemsHtml += `
+                    <div class="col-md-6 module-checkbox-item">
+                        <div class="form-check p-2 border rounded bg-white shadow-sm d-flex align-items-center mb-1 ${isAllowed ? '' : 'opacity-50'}">
+                            <input class="form-check-input me-3 ms-1 module-checkbox" type="checkbox" value="${p.id}" id="mod_chk_${p.id}" ${isChecked} ${disabledAttr}>
+                            <label class="form-check-label w-100 d-flex align-items-center text-dark fw-semibold small" for="mod_chk_${p.id}">
+                                <i class="bi ${p.icon} fs-5 me-2 ${p.color || ''}" ${styleAttr}></i>
+                                <span class="text-truncate">${esc(p.title)}</span>
+                            </label>
+                        </div>
+                    </div>`;
+            });
+            container.innerHTML += `
+                <div class="module-category-group mb-3">
+                    <h6 class="fw-bold text-dark small text-uppercase mb-2 border-bottom pb-1">${group.category}</h6>
+                    <div class="row g-2">${itemsHtml}</div>
+                </div>`;
+        });
+
+        document.getElementById('moduleSearchInput').value = '';
+        new bootstrap.Modal(document.getElementById('modulesModal')).show();
+    };
+
+    window.filterModulesModal = function() {
+        const query = document.getElementById('moduleSearchInput').value.toLowerCase().trim();
+        document.querySelectorAll('.module-checkbox-item').forEach(item => {
+            item.style.display = item.textContent.toLowerCase().includes(query) ? 'block' : 'none';
+        });
+        document.querySelectorAll('.module-category-group').forEach(group => {
+            const anyVisible = Array.from(group.querySelectorAll('.module-checkbox-item')).some(i => i.style.display !== 'none');
+            group.style.display = anyVisible ? '' : 'none';
+        });
+    };
+
+    window.saveVisibleModules = async function() {
+        const modules = [];
+        document.querySelectorAll('.module-checkbox:checked').forEach(chk => modules.push(chk.value));
+
+        try {
+            const res = await fetch('/api/auth/modules', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ modules })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                window._visibleModuleIds = data.visible;
+                bootstrap.Modal.getInstance(document.getElementById('modulesModal')).hide();
+                loadUserPreferences(); // przelicz widoczność kafelków i skrótów od razu, bez przeładowania
+            } else {
+                alert("Błąd zapisu modułów: " + (data.error || res.statusText));
+            }
+        } catch(e) {
+            console.error(e);
+            alert("Błąd połączenia z serwerem");
+        }
+    };
+
+    window.resetVisibleModules = async function() {
+        if (!confirm("Przywrócić wszystkie moduły jako widoczne?")) return;
+        try {
+            const res = await fetch('/api/auth/modules', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ modules: [] }) // pusta lista = wszystkie widoczne (domyślne)
+            });
+            const data = await res.json();
+            if (res.ok) {
+                window._visibleModuleIds = data.visible;
+                bootstrap.Modal.getInstance(document.getElementById('modulesModal')).hide();
+                loadUserPreferences();
+            } else {
+                alert("Błąd: " + (data.error || res.statusText));
+            }
+        } catch(e) {
+            console.error(e);
+            alert("Błąd połączenia z serwerem");
+        }
+    };
+
+    window.openEditSlotModal = function(slotId) {
+        if (!_dashboardData) return;
+
+        let foundSlot = null;
+
+        if (_dashboardData.busy_therapists) {
+            for (const th of _dashboardData.busy_therapists) {
+                const s = th.tasks.find(t => t.slot_id == slotId);
+                if (s) { foundSlot = s; break; }
+            }
+        }
+        if (!foundSlot && _dashboardData.busy_drivers) {
+            for (const dr of _dashboardData.busy_drivers) {
+                const s = dr.tasks.find(t => t.slot_id == slotId);
+                if (s) { foundSlot = s; break; }
+            }
+        }
+
+        if (!foundSlot) {
+            alert("Nie znaleziono danych wizyty.");
+            return;
+        }
+
+        const tSelect = document.getElementById('dashTherapistSelect');
+        const dSelect = document.getElementById('dashDriverSelect');
+
+        tSelect.innerHTML = '<option value="">-- Brak --</option>';
+        dSelect.innerHTML = '<option value="">-- Brak --</option>';
+
+        _allTherapists.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t.id;
+            opt.text = t.full_name;
+            tSelect.appendChild(opt);
+        });
+
+        _allDrivers.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d.id;
+            opt.text = d.full_name;
+            dSelect.appendChild(opt);
+        });
+
+        document.getElementById('dashSlotId').value = slotId;
+        const displayClientName = foundSlot.client_name && typeof foundSlot.client_name === 'object' ? foundSlot.group_name : foundSlot.client_name;
+        document.getElementById('dashClientName').textContent = displayClientName || 'Wizyta';
+        document.getElementById('dashSlotType').textContent = foundSlot.kind === 'therapy' ? 'Terapia' : (foundSlot.kind === 'pickup' ? 'Przywóz' : 'Odwóz');
+
+        if (foundSlot.start_iso) document.getElementById('dashStartTime').value = foundSlot.start_iso.substring(11, 16);
+        if (foundSlot.end_iso) document.getElementById('dashEndTime').value = foundSlot.end_iso.substring(11, 16);
+        document.getElementById('dashStatus').value = foundSlot.status || 'planned';
+
+        if (foundSlot.therapist_id) tSelect.value = foundSlot.therapist_id;
+        if (foundSlot.driver_id) dSelect.value = foundSlot.driver_id;
+
+        new bootstrap.Modal(document.getElementById('editDashboardSlotModal')).show();
+    };
+
+    window.saveDashboardSlotChanges = async function() {
+        const id = document.getElementById('dashSlotId').value;
+        const sTime = document.getElementById('dashStartTime').value;
+        const eTime = document.getElementById('dashEndTime').value;
+        const status = document.getElementById('dashStatus').value;
+
+        const tId = document.getElementById('dashTherapistSelect').value;
+        const dId = document.getElementById('dashDriverSelect').value;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        let dateStr = urlParams.get('date');
+        if (!dateStr) {
+             const d = new Date();
+             dateStr = new Date(d.getTime() - (d.getTimezoneOffset()*60000)).toISOString().split('T')[0];
+        }
+
+        const payload = {
+            starts_at: `${dateStr}T${sTime}:00`,
+            ends_at: `${dateStr}T${eTime}:00`,
+            status: status,
+            therapist_id: tId ? parseInt(tId) : null,
+            driver_id: dId ? parseInt(dId) : null
+        };
+
+        try {
+            const res = await fetch(`/api/schedule/${id}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('editDashboardSlotModal')).hide();
+                loadDashboardData(); 
+            } else {
+                let err = {};
+                try { err = await res.json(); } catch (_) {}
+                alert("Błąd: " + (err.error || ("Błąd serwera (HTTP " + res.status + ")")));
+            }
+        } catch(e) {
+            console.error(e);
+            alert("Błąd połączenia z serwerem");
+        }
+    };
+
+    window.deleteDashboardSlot = async function() {
+        if(!confirm("Czy na pewno chcesz usunąć to zadanie?")) return;
+        const id = document.getElementById('dashSlotId').value;
+        try {
+            const res = await fetch(`/api/schedule/${id}`, {method:'DELETE'});
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            bootstrap.Modal.getInstance(document.getElementById('editDashboardSlotModal')).hide();
+            loadDashboardData();
+        } catch(e) { alert("Błąd usuwania: " + e.message); }
+    };
+
+    window.openAbsenceModal = function() {
+        const modalEl = document.getElementById('absenceModal'); if (!modalEl) return;
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('absStart').value = today; document.getElementById('absEnd').value = today;
+        const adminArea = document.getElementById('adminSelectionArea');
+        const userInfo = document.getElementById('userSelectionInfo');
+        const userDisplay = document.getElementById('userDisplayName');
+        if (CURRENT_USER.canManageAbsences) {
+            adminArea.style.display = 'block'; userInfo.style.display = 'none';
+            window.loadPersonList(document.getElementById('roleTherapist').checked ? 'therapist' : 'driver');
+        } else {
+            adminArea.style.display = 'none'; userInfo.style.display = 'block';
+            userDisplay.textContent = CURRENT_USER.fullName;
+        }
+        new bootstrap.Modal(modalEl).show();
+    };
+
+    window.loadPersonList = async function(type) {
+        const sel = $('#absPersonId'); sel.empty().append('<option>Ładowanie...</option>');
+        try {
+            const res = await fetch(type === 'driver' ? '/api/drivers' : '/api/available-therapists');
+            const data = await res.json();
+            sel.empty().append('<option value="">-- Wybierz --</option>');
+            data.forEach(p => { if(p.active !== false) sel.append(new Option(p.full_name, p.id)); });
+        } catch(e) { sel.html('<option>Błąd</option>'); }
+    };
+
+    window.saveAbsence = async function(e) {
+        e.preventDefault();
+        let pid, type;
+        if (CURRENT_USER.canManageAbsences) {
+            pid = $('#absPersonId').val(); if(!pid) return alert("Wybierz pracownika!");
+            type = document.querySelector('input[name="personType"]:checked').value;
+        } else {
+            if (CURRENT_USER.therapistId) { pid = CURRENT_USER.therapistId; type = 'therapist'; }
+            else if (CURRENT_USER.driverId) { pid = CURRENT_USER.driverId; type = 'driver'; }
+            else return alert("Błąd profilu");
+        }
+        try {
+            const res = await fetch(type==='therapist'?'/api/absences':`/api/drivers/${pid}/absences`, {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ person_type: type, person_id: pid, reason: document.getElementById('absReason').value, start_date: document.getElementById('absStart').value, end_date: document.getElementById('absEnd').value })
+            });
+            if(res.ok) { bootstrap.Modal.getInstance(document.getElementById('absenceModal')).hide(); loadDashboardData(); alert("Zgłoszenie wysłane."); } else { alert("Błąd zapisu"); }
+        } catch(e) { alert("Błąd połączenia"); }
+    };
+
+    window.deleteAbsence = async function(id) {
+        if(!confirm("Na pewno usunąć ten wpis o nieobecności?")) return;
+        try {
+            const res = await fetch(`/api/absences/${id}`, {method:'DELETE'});
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            loadDashboardData();
+        } catch(e) { alert("Błąd usuwania nieobecności: " + e.message); }
+    };
+
+    window.extendSession = async function() { 
+        try {
+            await fetch('/api/keep-alive', {method:'POST'}); 
+            timeLeft = 900; 
+            if (warningModalInstance) {
+                warningModalInstance.hide();
+            }
+        } catch(e) {
+            console.error("Błąd komunikacji keep-alive:", e);
+        }
+    };
+
+    function loadDashboardData() {
+        const btn = document.getElementById('refreshBtn'); const icon = btn.querySelector('i');
+        btn.disabled = true; icon.className = 'spinner-border spinner-border-sm me-1';
+        const urlParams = new URLSearchParams(window.location.search);
+        let dateStr = urlParams.get('date');
+        if (!dateStr) { const d = new Date(); dateStr = new Date(d.getTime() - (d.getTimezoneOffset()*60000)).toISOString().split('T')[0]; }
+        document.getElementById('currentDate').textContent = new Date(dateStr).toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+        fetch(`/api/dashboard/stats?date=${dateStr}&t=${Date.now()}`)
+            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+            .then(data => {
+                if (!data || typeof data !== 'object') throw new Error('Nieprawidłowe dane');
+                _dashboardData = data;
+                renderList(document.getElementById('busyList'), data.busy_therapists || [], 'busy', 'primary');
+                renderList(document.getElementById('freeList'), data.free_therapists || [], 'free', 'success');
+                renderList(document.getElementById('absentList'), data.absent_therapists || [], 'absent', 'danger');
+                setCount('busyCount', data.busy_therapists); setCount('freeCount', data.free_therapists); setCount('absentCount', data.absent_therapists);
+                renderList(document.getElementById('driverBusyList'), data.busy_drivers || [], 'driver-busy', 'warning');
+                renderList(document.getElementById('driverFreeList'), data.free_drivers || [], 'free', 'secondary');
+                renderList(document.getElementById('driverAbsentList'), data.absent_drivers || [], 'absent', 'danger');
+                setCount('driverBusyCount', data.busy_drivers); setCount('driverFreeCount', data.free_drivers); setCount('driverAbsentCount', data.absent_drivers);
+            })
+            .catch(console.error)
+            .finally(() => { btn.disabled = false; icon.className = 'bi bi-arrow-clockwise me-1'; });
+    }
+
+    function renderList(el, list, type, color) {
+        if(!el) return;
+        if(!list || !list.length) { el.innerHTML = '<div class="text-center py-4 text-muted small">Brak wpisów</div>'; return; }
+        el.innerHTML = list.map(item => {
+            const initial = esc(((item.name || '?')).charAt(0));
+            if (type === 'busy') {
+                const tasks = item.tasks.map(t => {
+                    const isTus = t.is_tus;
+                    let displayName = t.client_name;
+                    let tooltipHtml = '';
+                    
+                    if (isTus && Array.isArray(t.members)) {
+                         displayName = `TUS: ${esc(t.group_name || 'Grupa')}`;
+                         tooltipHtml = `<div class="tus-members-wrapper"><ul class="tus-members-list">${t.members.map(m => `<li>${esc(m.name)}</li>`).join('')}</ul></div>`;
+                    }
+
+                    let startTimeStr = t.time_display || '';
+                    if (t.start_iso) {
+                        const isoString = t.start_iso.includes('+') || t.start_iso.endsWith('Z') ? t.start_iso : t.start_iso + 'Z';
+                        const d = new Date(isoString);
+                        startTimeStr = d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+                    }
+
+                    return `<div class="d-flex flex-column mb-1 pb-1 border-bottom border-light list-group-item" onclick="window.openEditSlotModal(${t.slot_id})" style="cursor:pointer" title="Edytuj">
+                                <div class="d-flex justify-content-between align-items-center w-100">
+                                    <span class="font-monospace text-muted small fw-bold">${startTimeStr}</span>
+                                    <span class="fw-bold text-truncate text-primary" style="max-width:120px">${displayName}</span>
+                                </div>
+                                ${tooltipHtml}
+                            </div>`;
+                }).join('');
+                return `<div class="list-group-item p-3"><div class="d-flex align-items-center mb-2"><div class="avatar-circle bg-${color} me-2">${initial}</div><span class="fw-bold text-dark small">${esc(item.name)}</span></div><div class="ps-0 pe-0">${tasks}</div></div>`;
+            
+            } else if (type === 'driver-busy') {
+                const tasks = item.tasks.map(t => {
+                    const icon = t.kind === 'pickup' ? '<i class="bi bi-box-arrow-in-right text-success"></i>' : '<i class="bi bi-box-arrow-right text-warning"></i>';
+                    let startTimeStr = t.time;
+                    if (t.start_iso && !startTimeStr) {
+                        startTimeStr = t.start_iso.substring(11, 16); 
+                    }
+
+                    return `<div class="d-flex justify-content-between mb-1 pb-1 border-bottom border-light small list-group-item" onclick="window.openEditSlotModal(${t.slot_id})" style="cursor:pointer" title="Edytuj"><div><span class="font-monospace text-muted fw-bold me-2">${startTimeStr}</span>${icon} ${esc(t.client)}</div></div>`;
+                }).join('');
+                return `<div class="list-group-item p-3"><div class="d-flex align-items-center mb-2"><div class="avatar-circle bg-${color} text-dark me-2">${initial}</div><span class="fw-bold text-dark small">${esc(item.name)}</span></div><div class="ps-0 pe-0">${tasks}</div></div>`;
+            
+            } else if (type === 'absent') {
+                const deleteBtn = (CURRENT_USER.isAdmin || CURRENT_USER.canManageAbsences) ? `<button class="btn btn-link btn-sm text-danger p-0 ms-2" onclick="window.deleteAbsence(${item.absence_id})" title="Usuń wpis o nieobecności"><i class="bi bi-trash fs-5"></i></button>` : '';
+                const reason = item.reason || 'Nieobecność';
+                const periodText = item.period ? `(${item.period})` : '';
+                
+                return `<div class="list-group-item p-3 d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-circle bg-${color} text-white me-3">${initial}</div>
+                                <div class="d-flex flex-column">
+                                    <span class="fw-bold text-dark small">${esc(item.name)}</span>
+                                    <span class="text-danger mt-1" style="font-size: 11px; font-weight: bold;">
+                                        <i class="bi bi-calendar-x me-1"></i>${esc(reason)} <br> <span class="text-muted fw-normal">${esc(periodText)}</span>
+                                    </span>
+                                </div>
+                            </div>
+                            ${deleteBtn}
+                        </div>`;
+            } else {
+                return `<div class="list-group-item d-flex align-items-center"><div class="avatar-circle bg-${color} me-2">${initial}</div><span class="small fw-bold">${esc(item.name)}</span></div>`;
+            }
+        }).join('');
+    }
+    
+    function setCount(id, list) { const el = document.getElementById(id); if(el) el.textContent = list ? list.length : 0; }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        warningModalInstance = bootstrap.Modal.getOrCreateInstance(document.getElementById('sessionWarningModal'));
+
+        try {
+            const [resTh, resDr] = await Promise.all([ fetch('/api/therapists'), fetch('/api/drivers') ]);
+            _allTherapists = (await resTh.json()).filter(x => x.active !== false).sort((a,b)=>a.full_name.localeCompare(b.full_name));
+            _allDrivers = (await resDr.json()).filter(x => x.active !== false).sort((a,b)=>a.full_name.localeCompare(b.full_name));
+        } catch(e) { console.error("Błąd ładowania zasobów:", e); }
+
+        const absForm = document.getElementById('absenceForm');
+        if(absForm) {
+            if ($('#absPersonId').length) $('#absPersonId').select2({ theme: 'bootstrap-5', dropdownParent: $('#absenceModal'), placeholder: "Wybierz..." });
+            absForm.addEventListener('submit', window.saveAbsence);
+        }
+
+        setInterval(() => {
+            timeLeft--;
+            const m = Math.floor(timeLeft/60), s=timeLeft%60;
+            const txt = `${m}:${s<10?'0'+s:s}`;
+            document.getElementById('sessionTimer').textContent = txt;
+            document.getElementById('modalTimer').textContent = txt;
+            
+            if(timeLeft < 60 && !document.getElementById('sessionWarningModal').classList.contains('show')) {
+                warningModalInstance.show();
+            }
+            if(timeLeft <= 0) location.href = "{{ url_for('auth.logout') }}";
+        }, 1000);
+
+        // Najpierw wybór widocznych modułów (żeby kafelki/skróty od razu były poprawnie schowane), potem dane i skróty
+        await loadModuleVisibility();
+        loadDashboardData();
+        loadUserPreferences();
+    });
+</script>
+</body>
+</html>
