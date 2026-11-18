@@ -3647,7 +3647,10 @@ print(f"--- APLIKACJA ŁĄCZY SIĘ Z BAZĄ DANYCH: {DATABASE_URL} ---")
 # === INICJALIZACJA BAZY DANYCH (ORM) ===
 engine = create_engine(DATABASE_URL, future=True)
 
-Base = declarative_base()
+# UWAGA: Base i SessionLocal sa zdefiniowane raz, przy pierwszym polaczeniu do bazy.
+# Druga rejestracja declarative_base() rozbijala modele na dwa osobne rejestry
+# i lamala relationship() miedzy nimi (np. FirmaSettings -> Firma) oraz sprawiala,
+# ze init_all_tables() nie tworzyla tabel zdefiniowanych przed ta linia.
 SessionLocal = scoped_session(
     sessionmaker(bind=engine, autocommit=False, autoflush=False, expire_on_commit=False, future=True)
 )
