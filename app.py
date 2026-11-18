@@ -18008,12 +18008,14 @@ def get_journal_reminder_settings():
     firma_id = session.get("firma_id", 1)
     try:
         with session_scope() as db:
+            if not db.query(Firma.id).filter_by(id=firma_id).first():
+                return jsonify({"error": f"Podmiot o id={firma_id} nie istnieje — wyloguj się i zaloguj ponownie."}), 404
             s = _get_or_create_settings(db, firma_id)
             return jsonify(s.as_dict()), 200
     except Exception as e:
         print(f"❌ Błąd get_journal_reminder_settings: {e}")
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e), "exception": type(e).__name__}), 500
 
 
 @admin_bp.route("/api/admin/firma-settings/journal-reminder", methods=["PUT"])
@@ -18043,6 +18045,8 @@ def update_journal_reminder_settings():
 
     try:
         with session_scope() as db:
+            if not db.query(Firma.id).filter_by(id=firma_id).first():
+                return jsonify({"error": f"Podmiot o id={firma_id} nie istnieje — wyloguj się i zaloguj ponownie."}), 404
             s = _get_or_create_settings(db, firma_id)
             s.journal_reminder_frequency = freq
             if freq != "disabled":
