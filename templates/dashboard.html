@@ -376,7 +376,7 @@
                     </div>
                     <div class="col-md-6">
                         <label class="form-label small fw-bold mb-1">Statusy sprawdzanych zajęć</label>
-                        <input type="text" id="jrStatuses" class="form-control form-control-sm" placeholder="done,confirmed" value="done">
+                        <input type="text" id="jrStatuses" class="form-control form-control-sm" placeholder="puste = wszystkie poza anulowanymi" value="">
                     </div>
                     <div class="col-md-6 d-flex align-items-end">
                         <button type="button" class="btn btn-sm btn-dark fw-bold" onclick="window.saveJournalReminderSchedule()">
@@ -397,7 +397,7 @@
                     </div>
                     <div class="col-md-4">
                         <label class="form-label small fw-bold mb-1">Statusy zajęć</label>
-                        <input type="text" id="jrPreviewStatuses" class="form-control form-control-sm" placeholder="done,confirmed" value="done">
+                        <input type="text" id="jrPreviewStatuses" class="form-control form-control-sm" placeholder="puste = wszystkie poza anulowanymi" value="">
                     </div>
                     <div class="col-md-5 d-flex align-items-end">
                         <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="window.loadMissingEntriesPreview()">
@@ -973,7 +973,7 @@
                 document.getElementById('jrHourG').value = String(c.hour);
                 document.getElementById('jrMinute').value = String(c.minute);
                 document.getElementById('jrDays').value = String(c.days);
-                document.getElementById('jrStatuses').value = c.statuses || 'done';
+                document.getElementById('jrStatuses').value = c.statuses || '';
                 document.getElementById('jrScheduleInfo').textContent =
                     'Nast\u0119pny automatyczny bieg: ' + (c.next_run ? String(c.next_run).replace('T', ' ').substring(0, 16) : 'automat wy\u0142\u0105czony')
                     + ' \u2014 automat ' + (c.enabled ? 'w\u0142\u0105czony' : 'wy\u0142\u0105czony')
@@ -1065,9 +1065,9 @@
         if (!box) return;
         box.innerHTML = '<div class="text-muted small"><i class="bi bi-hourglass-split me-1"></i> Sprawdzam braki...</div>';
         const days = document.getElementById('jrPreviewDays').value || 7;
-        const statuses = document.getElementById('jrPreviewStatuses').value || 'done';
+        const statuses = document.getElementById('jrPreviewStatuses').value;
         try {
-            const res = await fetch(`/api/dziennik/missing-entries?days=${encodeURIComponent(days)}&statuses=${encodeURIComponent(statuses)}`);
+            const res = await fetch(`/api/dziennik/missing-entries?days=${encodeURIComponent(days)}${statuses ? '&statuses=' + encodeURIComponent(statuses) : ''}`);
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
             if (!data.therapists || !data.therapists.length) {
@@ -1104,7 +1104,7 @@
         const countEl = document.getElementById('missingJournalCount');
         if (!listEl) return;
         try {
-            const res = await fetch('/api/dziennik/missing-entries?days=7&statuses=done');
+            const res = await fetch('/api/dziennik/missing-entries?days=7');
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
             const therapists = data.therapists || [];
@@ -1142,7 +1142,7 @@
             const res = await fetch('/api/dziennik/remind-therapists', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ days: 7, statuses: 'done' })
+                body: JSON.stringify({ days: 7 })
             });
             const data = await res.json().catch(() => ({}));
             if (res.ok) {

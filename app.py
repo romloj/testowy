@@ -17419,29 +17419,35 @@ def _parse_days(value, default=7):
     return max(1, min(d, 90))
 
 
-def _parse_statuses(value, default='done'):
-    """Akceptuje string 'done,confirmed' lub listę; zwraca listę statusów slotów."""
+def _parse_statuses(value, default=None):
+    """Akceptuje string 'done,confirmed' lub listę; zwraca listę statusów slotów.
+    Pusta wartość => [] (oznacza: WSZYSTKIE odbyte zajęcia, czyli każdy status poza 'cancelled')."""
     if isinstance(value, list):
         value = ','.join(str(v) for v in value)
-    if not value:
-        value = default
-    result = [s.strip() for s in str(value).split(',') if s.strip()]
-    return result or [default]
+    if value is None or not str(value).strip():
+        value = default or ''
+    return [s.strip() for s in str(value).split(',') if s.strip()]
 
 
-def _find_missing_journal_entries(firma_id, days, statuses):
+def _find_missing_journal_entries(firma_id, days, statuses=None):
     """
-    Znajduje odbyte zajęcia (schedule_slots, kind='therapy', status z listy 'statuses'),
-    dla których terapeuta NIE ma wpisu w dzienniku (dziennik.data = dzień zajęć).
+    Znajduje odbyte zajęcia (schedule_slots, kind='therapy') bez wpisu w dzienniku
+    (dziennik.data = dzień zajęć). Gdy 'statuses' jest puste, liczone są WSZYSTKIE
+    odbyte zajęcia (każdy status poza 'cancelled') — zajęcia przeszłe często pozostają
+    ze statusem 'planned', więc filtrowanie po 'done' pomijało część osób.
     Zwraca listę słowników pogrupowanych per terapeuta.
     """
     since = (datetime.now(TZ) - timedelta(days=days)).date()
     today = datetime.now(TZ).date()
     status_list = _parse_statuses(statuses)
-    placeholders = ', '.join(f':st{i}' for i in range(len(status_list)))
     params = {'fid': firma_id, 'since': since, 'today': today}
-    for i, s in enumerate(status_list):
-        params[f'st{i}'] = s
+    if status_list:
+        placeholders = ', '.join(f':st{i}' for i in range(len(status_list)))
+        status_cond = f"AND ss.status IN ({placeholders})"
+        for i, s in enumerate(status_list):
+            params[f'st{i}'] = s
+    else:
+        status_cond = "AND ss.status != 'cancelled'"
 
     sql = text(f"""
         SELECT ss.id AS slot_id,
@@ -17456,7 +17462,7 @@ def _find_missing_journal_entries(firma_id, days, statuses):
         LEFT JOIN clients c ON c.id = ss.client_id
         WHERE ss.firma_id = :fid
           AND ss.kind = 'therapy'
-          AND ss.status IN ({placeholders})
+          {status_cond}
           AND ss.therapist_id IS NOT NULL
           AND ss.client_id IS NOT NULL
           AND (ss.starts_at AT TIME ZONE 'Europe/Warsaw')::date >= :since
@@ -17499,13 +17505,13 @@ def _find_missing_journal_entries(firma_id, days, statuses):
 def dziennik_missing_entries():
     """
     Podgląd brakujących wpisów w dzienniku zajęć (bez wysyłki e-mail).
-    Parametry: ?days=7 (1-90), ?statuses=done,confirmed
+    Parametry: ?days=7 (1-90), ?statuses=done,confirmed (puste = wszystkie poza anulowanymi)
     """
     if not _can_manage_journal_reminders():
         return jsonify({'error': 'Brak uprawnień (wymagany admin, sekretariat lub uprawnienie "dziennik").'}), 403
 
     days = _parse_days(request.args.get('days'), default=7)
-    statuses = request.args.get('statuses', 'done')
+    statuses = request.args.get('statuses')
     firma_id = session.get('firma_id', 1)
 
     try:
@@ -17513,7 +17519,7 @@ def dziennik_missing_entries():
         total = sum(t['missing_count'] for t in result)
         return jsonify({
             'days': days,
-            'statuses': _parse_statuses(statuses),
+            'statuses': _parse_statuses(statuses) or ['wszystkie poza anulowanymi'],
             'total_missing': total,
             'therapists': result
         }), 200
@@ -17530,13 +17536,14 @@ def dziennik_remind_therapists():
     Wysyła e-mailowe przypomnienie terapeutom o konieczności uzupełnienia wpisów
     w dzienniku zajęć dla odbytych zajęć bez wpisu (dla bieżącego podmiotu z sesji).
     Body (opcjonalnie): {"days": 7, "statuses": "done,confirmed", "dry_run": false}
+    (puste 'statuses' = wszystkie odbyte zajęcia poza anulowanymi)
     """
     if not _can_manage_journal_reminders():
         return jsonify({'error': 'Brak uprawnień (wymagany admin, sekretariat lub uprawnienie "dziennik").'}), 403
 
     data = request.get_json(silent=True) or {}
     days = _parse_days(data.get('days', request.args.get('days')), default=7)
-    statuses = data.get('statuses', request.args.get('statuses', 'done'))
+    statuses = data.get('statuses', request.args.get('statuses'))
     dry_run = bool(data.get('dry_run', False)) or request.args.get('dry_run') in ('1', 'true', 'True')
     firma_id = session.get('firma_id', 1)
 
@@ -17560,7 +17567,7 @@ def dziennik_remind_therapists():
         return jsonify({'error': str(e)}), 500
 
 
-def _send_journal_reminders_for_firma(firma_id, days=7, statuses='done', dry_run=False, journal_url=None):
+def _send_journal_reminders_for_firma(firma_id, days=7, statuses=None, dry_run=False, journal_url=None):
     """
     Wysyła e-mailowe przypomnienia o brakujących wpisach w dzienniku zajęć
     dla JEDNEGO podmiotu (firma_id). Działa także POZA kontekstem żądania
@@ -17573,7 +17580,7 @@ def _send_journal_reminders_for_firma(firma_id, days=7, statuses='done', dry_run
     therapists = _find_missing_journal_entries(firma_id, days, statuses)
     stats = {
         'days': days,
-        'statuses': _parse_statuses(statuses),
+        'statuses': _parse_statuses(statuses) or ['wszystkie poza anulowanymi'],
         'dry_run': dry_run,
         'therapists_with_missing': len(therapists),
         'missing_total': sum(t['missing_count'] for t in therapists),
@@ -17635,7 +17642,7 @@ try:
     JOURNAL_REMINDER_DAYS = max(1, min(int(os.environ.get('JOURNAL_REMINDER_DAYS', '7')), 90))
 except ValueError:
     JOURNAL_REMINDER_DAYS = 7
-JOURNAL_REMINDER_STATUSES = os.environ.get('JOURNAL_REMINDER_STATUSES', 'done')
+JOURNAL_REMINDER_STATUSES = os.environ.get('JOURNAL_REMINDER_STATUSES', '')
 
 JOURNAL_SCHEDULE_KEY = 'journal_reminder_schedule'
 _DOW_MAP = {'mon': 0, 'monday': 0, 'pon': 0,
@@ -18077,8 +18084,8 @@ def update_journal_reminder_settings():
 def _get_missing_journal_entries_for_firma(firma_id):
     """
     Zwraca listę stringów opisujących BRAKUJĄCE wpisy w dzienniku.
-    Sesja 'therapy' ze statusem 'done' bez rekordu w tabeli dziennik
-    w ostatnich 14 dniach.
+    Każda odbyta sesja 'therapy' (status inny niż 'cancelled') bez rekordu
+    w tabeli dziennik w ostatnich 14 dniach.
     """
     with session_scope() as db:
         rows = db.execute(
@@ -18094,7 +18101,7 @@ def _get_missing_journal_entries_for_firma(firma_id):
                  AND d.data = (s.starts_at AT TIME ZONE 'Europe/Warsaw')::date
                 WHERE s.firma_id = :fid
                   AND s.kind     = 'therapy'
-                  AND s.status   = 'done'
+                  AND s.status  != 'cancelled'
                   AND s.therapist_id IS NOT NULL
                   AND d.id IS NULL
                   AND s.starts_at >= (NOW() - INTERVAL '14 days')
