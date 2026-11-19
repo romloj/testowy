@@ -17506,8 +17506,6 @@ def _find_missing_journal_entries(firma_id, days, statuses=None):
                t.email AS therapist_email
         FROM therapists t
         WHERE t.firma_id = :fid
-          AND t.active IS TRUE
-          AND COALESCE(t.email, '') <> ''
           AND NOT EXISTS (
               SELECT 1
               FROM dziennik d
@@ -17575,11 +17573,29 @@ def dziennik_missing_entries():
     try:
         result = _find_missing_journal_entries(firma_id, days, statuses)
         total = sum(t['missing_count'] for t in result)
+        today = datetime.now(TZ).date()
+        since = today - timedelta(days=days)
+        with engine.connect() as conn:
+            therapists_total = conn.execute(
+                text("SELECT COUNT(*) AS c FROM therapists WHERE firma_id = :fid"),
+                {'fid': firma_id}
+            ).scalar() or 0
+            therapists_with_entries = conn.execute(
+                text("SELECT COUNT(DISTINCT d.therapist_id) AS c FROM dziennik d "
+                     "WHERE d.firma_id = :fid AND d.data >= :since AND d.data < :today"),
+                {'fid': firma_id, 'since': since, 'today': today}
+            ).scalar() or 0
         return jsonify({
             'days': days,
-            'statuses': _parse_statuses(statuses) or ['wszystkie poza anulowanymi'],
+            'statuses': 'wszystkie (status ignorowany)',
             'total_missing': total,
-            'therapists': result
+            'therapists': result,
+            'diagnostics': {
+                'firma_id': firma_id,
+                'therapists_total': int(therapists_total),
+                'therapists_with_entries': int(therapists_with_entries),
+                'therapists_missing': len(result)
+            }
         }), 200
     except Exception as e:
         print(f"❌ Błąd pobierania brakujących wpisów dziennika: {e}")
@@ -18194,7 +18210,6 @@ def _get_missing_journal_entries_for_firma(firma_id):
             SELECT t.full_name AS therapist_name
             FROM therapists t
             WHERE t.firma_id = :fid
-              AND t.active IS TRUE
               AND NOT EXISTS (
                   SELECT 1
                   FROM dziennik d
