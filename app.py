@@ -17603,6 +17603,100 @@ def dziennik_missing_entries():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/journal-debug', methods=['GET'])
+@login_required
+@admin_required
+def journal_debug():
+    """
+    Diagnostyka podpięcia bazy dla sprawdzania zaległości w dzienniku.
+    Pokazuje wprost: podmioty, terapeutów z liczbą wpisów i zajęć, statystyki tabel.
+    """
+    now_tz = datetime.now(TZ)
+    today = now_tz.date()
+    since = today - timedelta(days=7)
+    out = {'now_tz': now_tz.isoformat(), 'session_firma_id': session.get('firma_id', 1)}
+
+    def safe(name, fn):
+        try:
+            out[name] = fn()
+        except Exception as e:
+            out[name] = f"BŁĄD: {e}"
+
+    def q_firmy():
+        with engine.connect() as conn:
+            return [dict(r) for r in conn.execute(text(
+                "SELECT id, typ, nazwa_pelna FROM firma ORDER BY id")).mappings().all()]
+
+    def q_terapeuci():
+        with engine.connect() as conn:
+            return [dict(r) for r in conn.execute(text("""
+                SELECT t.id, t.full_name, t.active, COALESCE(t.email, '') AS email,
+                       t.firma_id,
+                       (SELECT COUNT(*) FROM dziennik d
+                         WHERE d.therapist_id = t.id AND d.data >= :since AND d.data < :today) AS wpisy_7dni,
+                       (SELECT COUNT(*) FROM dziennik d
+                         WHERE d.therapist_id = t.id AND d.data >= :since14 AND d.data < :today) AS wpisy_14dni,
+                       (SELECT COUNT(*) FROM schedule_slots s
+                         WHERE s.therapist_id = t.id AND s.kind = 'therapy'
+                           AND (s.starts_at AT TIME ZONE 'Europe/Warsaw')::date >= :since
+                           AND (s.starts_at AT TIME ZONE 'Europe/Warsaw')::date < :today) AS zajecia_7dni
+                FROM therapists t
+                ORDER BY t.firma_id, t.full_name
+            """), {'since': since, 'since14': since - timedelta(days=7), 'today': today}).mappings().all()]
+
+    def q_dziennik_stats():
+        with engine.connect() as conn:
+            return dict(conn.execute(text("""
+                SELECT COUNT(*) AS wpisow_lacznie,
+                       COUNT(DISTINCT d.therapist_id) AS terapeutow_z_wpisami,
+                       MIN(d.data)::text AS najstarszy_wpis,
+                       MAX(d.data)::text AS najnowszy_wpis
+                FROM dziennik d
+            """)).mappings().first() or {})
+
+    def q_dziennik_ostatnie():
+        with engine.connect() as conn:
+            rows = conn.execute(text("""
+                SELECT d.data::text AS data, t.full_name AS terapeuta, c.full_name AS klient
+                FROM dziennik d
+                LEFT JOIN therapists t ON t.id = d.therapist_id
+                LEFT JOIN clients c ON c.id = d.client_id
+                ORDER BY d.data DESC, d.id DESC
+                LIMIT 8
+            """)).mappings().all()
+            return [dict(r) for r in rows]
+
+    def q_sloty_statusy():
+        with engine.connect() as conn:
+            return [dict(r) for r in conn.execute(text("""
+                SELECT status, COUNT(*) AS ile
+                FROM schedule_slots
+                WHERE kind = 'therapy'
+                  AND (starts_at AT TIME ZONE 'Europe/Warsaw')::date >= :since
+                  AND (starts_at AT TIME ZONE 'Europe/Warsaw')::date < :today
+                GROUP BY status ORDER BY status
+            """), {'since': since, 'today': today}).mappings().all()]
+
+    def q_tus():
+        with engine.connect() as conn:
+            return dict(conn.execute(text("""
+                SELECT COUNT(*) AS sesji_7dni,
+                       (SELECT COUNT(*) FROM tus_session_attendance a
+                         JOIN tus_sessions ts2 ON ts2.id = a.session_id
+                         WHERE ts2.session_date >= :since AND ts2.session_date < :today) AS obecnosci_7dni
+                FROM tus_sessions ts
+                WHERE ts.session_date >= :since AND ts.session_date < :today
+            """), {'since': since, 'today': today}).mappings().first() or {})
+
+    safe('firmy', q_firmy)
+    safe('terapeuci', q_terapeuci)
+    safe('dziennik_statystyki', q_dziennik_stats)
+    safe('dziennik_ostatnie_wpisy', q_dziennik_ostatnie)
+    safe('zajecia_indywidualne_7dni_wg_statusu', q_sloty_statusy)
+    safe('zajecia_tus_7dni', q_tus)
+    return jsonify(out), 200
+
+
 @app.route('/api/dziennik/remind-therapists', methods=['POST'])
 @login_required
 def dziennik_remind_therapists():
