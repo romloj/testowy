@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedSystem Ai Pro 1.5 - Animacja 3D - Menu</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 40px 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+        
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            color: #2E86AB;
+            text-shadow: 0 0 20px rgba(46, 134, 171, 0.5);
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            color: #A23B72;
+            margin-bottom: 20px;
+        }
+        
+        .description {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: #e0e0e0;
+            max-width: 800px;
+            margin: 0 auto 40px;
+        }
+        
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-bottom: 60px;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+        
+        .card:hover {
+            transform: translateY(-10px);
+            border-color: rgba(46, 134, 171, 0.5);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+        
+        .card-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .card h2 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: #2E86AB;
+        }
+        
+        .card p {
+            color: #e0e0e0;
+            line-height: 1.6;
+            margin-bottom: 25px;
+        }
+        
+        .card-links {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            display: inline-block;
+            background: rgba(46, 134, 171, 0.8);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .btn:hover {
+            background: rgba(46, 134, 171, 1);
+            transform: translateY(-2px);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #2E86AB, #A23B72);
+        }
+        
+        .btn-secondary {
+            background: rgba(162, 59, 114, 0.8);
+        }
+        
+        .features {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .features h2 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2rem;
+            color: #2E86AB;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        
+        .feature {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .feature-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(46, 134, 171, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #2E86AB;
+            font-weight: bold;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 40px 0;
+            color: #888;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            margin-top: 40px;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #2E86AB;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            color: #888;
+        }
+        
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .cards {
+                grid-template-columns: 1fr;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats {
+                gap: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎬 MedSystem Ai Pro 1.5</h1>
+            <p class="subtitle">Animacja 3D - Prezenter</p>
+            <p class="description">
+                Kompletna animacja 3D prezentująca aplikację MedSystem Ai Pro 1.5. 
+                Obejmuje 6 scen dopasowanych do struktury dokumentu, interaktywną nawigację 
+                i profesjonalną grafikę 3D.
+            </p>
+        </header>
+        
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-number">6</div>
+                <div class="stat-label">Scen</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">19</div>
+                <div class="stat-label">Ujęć Storyboard</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">4</div>
+                <div class="stat-label">Pliki</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">✅</div>
+                <div class="stat-label">Gotowe</div>
+            </div>
+        </div>
+        
+        <div class="cards">
+            <div class="card">
+                <div class="card-icon">🎮</div>
+                <h2>Animacja Webowa</h2>
+                <p>
+                    Interaktywna animacja 3D w przeglądarce. Działa od razu bez instalacji. 
+                    Obsługuje nawigację myszką, wybór scen i kontrolki odtwarzania.
+                </p>
+                <div class="card-links">
+                    <a href="animacja_medsystem.html" class="btn btn-primary">Uruchom Animację</a>
+                    <a href="#" class="btn btn-secondary" onclick="alert('Plik: animacja_medsystem.html\nTechnologia: Three.js\nWaga: ~39 KB')">Więcej Info</a>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-icon">📋</div>
+                <h2>Storyboard</h2>
+                <p>
+                    Szczegółowy storyboard z opisem 19 scen, modeli 3D, oświetlenia, kamer 
+                    i harmonogramem realizacji. Idealny dla zespołu produkcyjnego.
+                </p>
+                <div class="card-links">
+                    <a href="STORYBOARD_Animacja3D_MedSystem.md" class="btn btn-primary">Otwórz Storyboard</a>
+                    <a href="#" class="btn btn-secondary" onclick="alert('Plik: STORYBOARD_Animacja3D_MedSystem.md\nFormat: Markdown\nSceny: 19')">Więcej Info</a>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-icon">🐍</div>
+                <h2>Skrypt Blender</h2>
+                <p>
+                    Python script dla Blendera 3.6+. Tworzy kompletną scenę z modelami, 
+                    oświetleniem, kamerami i animacjami. Gotowy do renderowania.
+                </p>
+                <div class="card-links">
+                    <a href="blender_script.py" class="btn btn-primary" download>Pobierz Skrypt</a>
+                    <a href="#" class="btn btn-secondary" onclick="alert('Plik: blender_script.py\nWymagania: Blender 3.6+, Python 3.10+\nFunkcje: Modele, animacje, oświetlenie')">Więcej Info</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="features">
+            <h2>✨ Funkcjonalności</h2>
+            <div class="features-grid">
+                <div class="feature">
+                    <div class="feature-icon">🎭</div>
+                    <span>6 gotowych scen animacji</span>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🖱️</div>
+                    <span>Interaktywna nawigacja kamerą</span>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🎛️</div>
+                    <span>Kontrolki odtwarzania</span>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">📱</div>
+                    <span>Responsywna (działa na mobile)</span>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🎨</div>
+                    <span>Kolorystyka MedSystem</span>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">⚡</div>
+                    <span>60 FPS - płynne animacje</span>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🌐</div>
+                    <span>WebGL - nowoczesna grafika</span>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">📦</div>
+                    <span>Samodzielny plik HTML</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="cards">
+            <div class="card">
+                <div class="card-icon">📖</div>
+                <h2>Dokumentacja</h2>
+                <p>
+                    Pełna dokumentacja z instrukcjami, poradami, rozwiązywaniem problemów 
+                    i przykładami dostosowania animacji do własnych potrzeb.
+                </p>
+                <div class="card-links">
+                    <a href="README_Animacja3D.md" class="btn btn-primary">Przeczytaj README</a>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-icon">📊</div>
+                <h2>Podsumowanie</h2>
+                <p>
+                    Kompleksowe podsumowanie projektu z mapowaniem do dokumentu, 
+                    specyfikacją techniczną i zaleceniami dotyczącymi rozbudowy.
+                </p>
+                <div class="card-links">
+                    <a href="SUMMARY.md" class="btn btn-primary">Otwórz Podsumowanie</a>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p><strong>MedSystem Ai Pro 1.5 - Animacja 3D</strong></p>
+            <p>Wersja: 1.0 | Data: 2024 | Autor: Vibe Code (Mistral AI)</p>
+            <p>Technologie: Three.js, HTML5, CSS3, JavaScript, Blender Python</p>
+        </footer>
+    </div>
+    
+    <script>
+        // Auto-redirect to animation after 5 seconds if user is idle
+        let idleTime = 0;
+        const idleInterval = setInterval(() => {
+            idleTime++;
+            if (idleTime >= 5) {
+                // Check if user has interacted
+                if (!window.hasInteracted) {
+                    // Don't redirect, just show a hint
+                    const hint = document.createElement('div');
+                    hint.style.position = 'fixed';
+                    hint.style.bottom = '20px';
+                    hint.style.right = '20px';
+                    hint.style.background = 'rgba(46, 134, 171, 0.9)';
+                    hint.style.color = 'white';
+                    hint.style.padding = '15px 20px';
+                    hint.style.borderRadius = '10px';
+                    hint.style.cursor = 'pointer';
+                    hint.style.zIndex = '1000';
+                    hint.innerHTML = '👉 <strong>Kliknij tutaj</strong> aby uruchomić animację!';
+                    hint.onclick = () => {
+                        window.location.href = 'animacja_medsystem.html';
+                    };
+                    document.body.appendChild(hint);
+                    clearInterval(idleInterval);
+                }
+            }
+        }, 1000);
+        
+        // Track user interaction
+        document.addEventListener('mousemove', () => {
+            window.hasInteracted = true;
+            idleTime = 0;
+        });
+        
+        document.addEventListener('click', () => {
+            window.hasInteracted = true;
+            idleTime = 0;
+        });
+        
+        document.addEventListener('keydown', () => {
+            window.hasInteracted = true;
+            idleTime = 0;
+        });
+    </script>
+</body>
+</html>

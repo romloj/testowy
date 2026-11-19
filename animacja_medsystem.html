@@ -1,0 +1,1088 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedSystem Ai Pro 1.5 - Animacja 3D</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            overflow: hidden;
+            background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        canvas {
+            display: block;
+        }
+        
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-size: 14px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        #info h1 {
+            font-size: 18px;
+            margin-bottom: 8px;
+            color: #2E86AB;
+        }
+        
+        #info p {
+            margin: 5px 0;
+            color: #e0e0e0;
+        }
+        
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0f2027 0%, #203a43 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+            z-index: 1000;
+            transition: opacity 0.5s;
+        }
+        
+        #loading.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .loader {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(46, 134, 171, 0.3);
+            border-top-color: #2E86AB;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        #progress {
+            width: 300px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+        
+        #progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #2E86AB, #A23B72);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 100;
+        }
+        
+        button {
+            background: rgba(46, 134, 171, 0.8);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+        
+        button:hover {
+            background: rgba(46, 134, 171, 1);
+            transform: translateY(-2px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        #scene-selector {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+        
+        #scene-selector select {
+            background: rgba(46, 134, 171, 0.3);
+            color: white;
+            border: 1px solid #2E86AB;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 200px;
+        }
+        
+        #scene-selector option {
+            background: #0f2027;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div class="loader"></div>
+        <p>Ładowanie MedSystem Ai Pro 1.5...</p>
+        <div id="progress">
+            <div id="progress-bar"></div>
+        </div>
+    </div>
+    
+    <div id="info">
+        <h1>MedSystem Ai Pro 1.5</h1>
+        <p>Animacja 3D: Prezenter</p>
+        <p id="scene-info">Scena: Introdukcja</p>
+    </div>
+    
+    <div id="scene-selector">
+        <select id="scene-select">
+            <option value="intro">1. Introdukcja</option>
+            <option value="problems">2. Problemy Medyczne</option>
+            <option value="solution">3. Rozwiązanie - MedSystem</option>
+            <option value="features">4. Funkcjonalności</option>
+            <option value="benefits">5. Korzyści</option>
+            <option value="cta">6. Call to Action</option>
+        </select>
+    </div>
+    
+    <div id="controls">
+        <button id="play-btn">▶ Odtwórz</button>
+        <button id="reset-btn">↻ Zresetuj</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
+    
+    <script>
+        // ============================================
+        // KONFIGURACJA
+        // ============================================
+        
+        const CONFIG = {
+            colors: {
+                primary: 0x2E86AB,
+                secondary: 0xA23B72,
+                accent: 0xFFFFFF,
+                background: 0x0f2027,
+                text: 0x203a43
+            },
+            camera: {
+                fov: 60,
+                near: 0.1,
+                far: 1000,
+                position: { x: 0, y: 2, z: 5 }
+            },
+            renderer: {
+                antialias: true,
+                alpha: true,
+                shadowMap: true
+            }
+        };
+        
+        // ============================================
+        // ZMIENNE GLOBALNE
+        // ============================================
+        
+        let scene, camera, renderer, controls;
+        let presenter, interfaceMesh, logoMesh, room;
+        let clock = new THREE.Clock();
+        let mixer, animations = {};
+        let currentScene = 'intro';
+        let isPlaying = false;
+        let animationProgress = 0;
+        
+        // ============================================
+        // INICJALIZACJA
+        // ============================================
+        
+        function init() {
+            // Scena
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(CONFIG.colors.background);
+            scene.fog = new THREE.Fog(CONFIG.colors.background, 10, 50);
+            
+            // Kamera
+            camera = new THREE.PerspectiveCamera(
+                CONFIG.camera.fov,
+                window.innerWidth / window.innerHeight,
+                CONFIG.camera.near,
+                CONFIG.camera.far
+            );
+            camera.position.set(
+                CONFIG.camera.position.x,
+                CONFIG.camera.position.y,
+                CONFIG.camera.position.z
+            );
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer(CONFIG.renderer);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
+            document.body.appendChild(renderer.domElement);
+            
+            // Kontrolki orbit
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.screenSpacePanning = false;
+            controls.maxPolarAngle = Math.PI / 2 - 0.1;
+            controls.minDistance = 2;
+            controls.maxDistance = 20;
+            
+            // Oświetlenie
+            setupLights();
+            
+            // Środowisko
+            createEnvironment();
+            
+            // Prezenter (uproszczony model)
+            createPresenter();
+            
+            // Interfejs MedSystem
+            createInterface();
+            
+            // Logo
+            createLogo();
+            
+            // Obsługa zdarzeń
+            setupEventListeners();
+            
+            // Animacje
+            setupAnimations();
+            
+            // Zakończenie ładowania
+            setTimeout(() => {
+                document.getElementById('loading').classList.add('hidden');
+            }, 1000);
+        }
+        
+        // ============================================
+        // OŚWIETLENIE
+        // ============================================
+        
+        function setupLights() {
+            // Światło ambient
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+            scene.add(ambientLight);
+            
+            // Światło główne (słońce)
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 7);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 50;
+            directionalLight.shadow.camera.left = -20;
+            directionalLight.shadow.camera.right = 20;
+            directionalLight.shadow.camera.top = 20;
+            directionalLight.shadow.camera.bottom = -20;
+            scene.add(directionalLight);
+            
+            // Światło niebieskie (akcent)
+            const blueLight = new THREE.PointLight(CONFIG.colors.primary, 1, 20);
+            blueLight.position.set(-5, 5, -5);
+            scene.add(blueLight);
+            
+            // Światło różowe (akcent)
+            const pinkLight = new THREE.PointLight(CONFIG.colors.secondary, 1, 20);
+            pinkLight.position.set(5, 5, -5);
+            scene.add(pinkLight);
+            
+            // Helpery (tylko w debug)
+            // const lightHelper = new THREE.DirectionalLightHelper(directionalLight, 1);
+            // scene.add(lightHelper);
+        }
+        
+        // ============================================
+        // ŚRODOWISKO (Sala Konferencyjna)
+        // ============================================
+        
+        function createEnvironment() {
+            room = new THREE.Group();
+            scene.add(room);
+            
+            // Podłoga
+            const floorGeometry = new THREE.PlaneGeometry(30, 30);
+            const floorMaterial = new THREE.MeshStandardMaterial({
+                color: 0x1a1a2e,
+                roughness: 0.8,
+                metalness: 0.2
+            });
+            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            room.add(floor);
+            
+            // Ściany
+            const wallGeometry = new THREE.PlaneGeometry(30, 10);
+            const wallMaterial = new THREE.MeshStandardMaterial({
+                color: 0x16213e,
+                roughness: 0.7,
+                metalness: 0.1
+            });
+            
+            // Ściana tylna
+            const wallBack = new THREE.Mesh(wallGeometry, wallMaterial);
+            wallBack.position.set(0, 5, -15);
+            room.add(wallBack);
+            
+            // Ściany boczne
+            const wallSideGeometry = new THREE.PlaneGeometry(10, 10);
+            const wallLeft = new THREE.Mesh(wallSideGeometry, wallMaterial);
+            wallLeft.rotation.y = Math.PI / 2;
+            wallLeft.position.set(-15, 5, 0);
+            room.add(wallLeft);
+            
+            const wallRight = new THREE.Mesh(wallSideGeometry, wallMaterial);
+            wallRight.rotation.y = -Math.PI / 2;
+            wallRight.position.set(15, 5, 0);
+            room.add(wallRight);
+            
+            // Sufit
+            const ceiling = new THREE.Mesh(floorGeometry, wallMaterial);
+            ceiling.position.y = 10;
+            room.add(ceiling);
+            
+            // Ekran LED (tylna ściana)
+            const screenGeometry = new THREE.PlaneGeometry(12, 7);
+            const screenMaterial = new THREE.MeshStandardMaterial({
+                color: 0x000000,
+                emissive: 0x2E86AB,
+                emissiveIntensity: 0.3,
+                roughness: 0.1,
+                metalness: 0.5
+            });
+            const screen = new THREE.Mesh(screenGeometry, screenMaterial);
+            screen.position.set(0, 4, -14.9);
+            room.add(screen);
+            
+            // Stół konferencyjny
+            const tableGeometry = new THREE.BoxGeometry(6, 0.2, 3);
+            const tableMaterial = new THREE.MeshStandardMaterial({
+                color: 0x3a4a5c,
+                roughness: 0.4,
+                metalness: 0.3
+            });
+            const table = new THREE.Mesh(tableGeometry, tableMaterial);
+            table.position.set(0, 0.1, -5);
+            table.castShadow = true;
+            room.add(table);
+            
+            // Krzesła
+            for (let i = -2; i <= 2; i++) {
+                const chairGeometry = new THREE.BoxGeometry(0.8, 1, 0.8);
+                const chairMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x2c3e50,
+                    roughness: 0.6
+                });
+                const chair = new THREE.Mesh(chairGeometry, chairMaterial);
+                chair.position.set(i * 1.5, 0.5, -3);
+                chair.castShadow = true;
+                room.add(chair);
+            }
+            
+            // Dekoracje - cząsteczki światła
+            createParticles();
+        }
+        
+        // ============================================
+        // CZĄSTECZKI ŚWIATŁA
+        // ============================================
+        
+        function createParticles() {
+            const particleCount = 200;
+            const particles = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 3);
+            
+            for (let i = 0; i < particleCount; i++) {
+                positions[i * 3] = (Math.random() - 0.5) * 30;
+                positions[i * 3 + 1] = Math.random() * 10;
+                positions[i * 3 + 2] = (Math.random() - 0.5) * 30;
+                
+                colors[i * 3] = Math.random();
+                colors[i * 3 + 1] = Math.random();
+                colors[i * 3 + 2] = Math.random();
+            }
+            
+            particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            particles.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            
+            const particleMaterial = new THREE.PointsMaterial({
+                size: 0.1,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8,
+                sizeAttenuation: true
+            });
+            
+            const particleSystem = new THREE.Points(particles, particleMaterial);
+            scene.add(particleSystem);
+        }
+        
+        // ============================================
+        // PREZENTER (Uproszczony model)
+        // ============================================
+        
+        function createPresenter() {
+            const group = new THREE.Group();
+            group.position.set(0, 0, -3);
+            scene.add(group);
+            
+            // Ciało (uproszczone - walec + sfera)
+            const bodyGeometry = new THREE.CylinderGeometry(0.3, 0.4, 1.8, 16);
+            const bodyMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                roughness: 0.7
+            });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.9;
+            body.castShadow = true;
+            group.add(body);
+            
+            // Głowa
+            const headGeometry = new THREE.SphereGeometry(0.3, 16, 16);
+            const headMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffd4a3,
+                roughness: 0.8
+            });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = 1.8;
+            head.castShadow = true;
+            group.add(head);
+            
+            // Ubranie (kitel)
+            const coatGeometry = new THREE.CylinderGeometry(0.35, 0.45, 1.5, 16);
+            const coatMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                roughness: 0.5,
+                metalness: 0.1
+            });
+            const coat = new THREE.Mesh(coatGeometry, coatMaterial);
+            coat.position.y = 0.75;
+            group.add(coat);
+            
+            // Ręce
+            const armGeometry = new THREE.CylinderGeometry(0.08, 0.08, 0.8, 8);
+            const armMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffd4a3,
+                roughness: 0.8
+            });
+            
+            const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+            leftArm.position.set(-0.4, 1.4, 0);
+            leftArm.rotation.z = Math.PI / 4;
+            group.add(leftArm);
+            
+            const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+            rightArm.position.set(0.4, 1.4, 0);
+            rightArm.rotation.z = -Math.PI / 4;
+            group.add(rightArm);
+            
+            // Nogi
+            const legGeometry = new THREE.CylinderGeometry(0.1, 0.15, 0.8, 8);
+            const legMaterial = new THREE.MeshStandardMaterial({
+                color: 0x2c3e50,
+                roughness: 0.7
+            });
+            
+            const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+            leftLeg.position.set(-0.15, 0.4, 0);
+            group.add(leftLeg);
+            
+            const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+            rightLeg.position.set(0.15, 0.4, 0);
+            group.add(rightLeg);
+            
+            // Buty
+            const shoeGeometry = new THREE.BoxGeometry(0.2, 0.1, 0.3);
+            const shoeMaterial = new THREE.MeshStandardMaterial({
+                color: 0x000000,
+                roughness: 0.8
+            });
+            
+            const leftShoe = new THREE.Mesh(shoeGeometry, shoeMaterial);
+            leftShoe.position.set(-0.15, 0.1, 0.15);
+            group.add(leftShoe);
+            
+            const rightShoe = new THREE.Mesh(shoeGeometry, shoeMaterial);
+            rightShoe.position.set(0.15, 0.1, 0.15);
+            group.add(rightShoe);
+            
+            presenter = group;
+        }
+        
+        // ============================================
+        // INTERFEJS MEDSYSTEM (3D)
+        // ============================================
+        
+        function createInterface() {
+            const group = new THREE.Group();
+            group.position.set(2, 2, -6);
+            group.visible = false;
+            scene.add(group);
+            
+            // Główne okno
+            const mainWindowGeometry = new THREE.BoxGeometry(3, 2, 0.1);
+            const mainWindowMaterial = new THREE.MeshStandardMaterial({
+                color: 0x2E86AB,
+                transparent: true,
+                opacity: 0.8,
+                roughness: 0.2,
+                metalness: 0.5,
+                emissive: 0x2E86AB,
+                emissiveIntensity: 0.3
+            });
+            const mainWindow = new THREE.Mesh(mainWindowGeometry, mainWindowMaterial);
+            group.add(mainWindow);
+            
+            // Nagłówek
+            const headerGeometry = new THREE.BoxGeometry(3, 0.3, 0.1);
+            const headerMaterial = new THREE.MeshStandardMaterial({
+                color: 0x1a1a2e,
+                roughness: 0.1,
+                metalness: 0.6
+            });
+            const header = new THREE.Mesh(headerGeometry, headerMaterial);
+            header.position.y = 0.95;
+            group.add(header);
+            
+            // Tytuł "MedSystem Ai Pro"
+            createText3D("MedSystem Ai Pro", group, { x: 0, y: 0.95, z: 0.06 }, 0.2, 0xffffff);
+            
+            // Obszar wykresów
+            const chartGeometry = new THREE.BoxGeometry(1.2, 0.8, 0.05);
+            const chartMaterial = new THREE.MeshStandardMaterial({
+                color: 0xA23B72,
+                transparent: true,
+                opacity: 0.9,
+                roughness: 0.3
+            });
+            const chart = new THREE.Mesh(chartGeometry, chartMaterial);
+            chart.position.set(-0.7, 0, 0.06);
+            group.add(chart);
+            
+            // Obszar danych pacjenta
+            const patientGeometry = new THREE.BoxGeometry(1.2, 0.8, 0.05);
+            const patientMaterial = new THREE.MeshStandardMaterial({
+                color: 0x2E86AB,
+                transparent: true,
+                opacity: 0.9,
+                roughness: 0.3
+            });
+            const patientArea = new THREE.Mesh(patientGeometry, patientMaterial);
+            patientArea.position.set(0.7, 0, 0.06);
+            group.add(patientArea);
+            
+            // Wykres liniowy (animowany)
+            createChart(group);
+            
+            // Przyciski
+            for (let i = 0; i < 3; i++) {
+                const buttonGeometry = new THREE.BoxGeometry(0.4, 0.15, 0.05);
+                const buttonMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xffffff,
+                    roughness: 0.3,
+                    metalness: 0.4
+                });
+                const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
+                button.position.set(i * 0.5 - 0.5, -0.7, 0.06);
+                group.add(button);
+            }
+            
+            interfaceMesh = group;
+        }
+        
+        // ============================================
+        // WYKRES 3D
+        // ============================================
+        
+        function createChart(parent) {
+            const chartGroup = new THREE.Group();
+            chartGroup.position.set(-0.7, 0, 0.1);
+            parent.add(chartGroup);
+            
+            // Linie wykresu
+            const lineMaterial = new THREE.LineBasicMaterial({ color: 0xA23B72 });
+            const points = [];
+            
+            for (let i = 0; i < 10; i++) {
+                points.push(new THREE.Vector3(
+                    (i - 5) * 0.2,
+                    Math.sin(i * 0.5) * 0.3,
+                    0
+                ));
+            }
+            
+            const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+            const line = new THREE.Line(lineGeometry, lineMaterial);
+            chartGroup.add(line);
+            
+            // Punkty danych
+            const pointGeometry = new THREE.SphereGeometry(0.03, 8, 8);
+            const pointMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            
+            for (let i = 0; i < points.length; i++) {
+                const point = new THREE.Mesh(pointGeometry, pointMaterial);
+                point.position.copy(points[i]);
+                chartGroup.add(point);
+            }
+        }
+        
+        // ============================================
+        // LOGO MEDSYSTEM
+        // ============================================
+        
+        function createLogo() {
+            const group = new THREE.Group();
+            group.position.set(0, 3, -8);
+            group.visible = false;
+            scene.add(group);
+            
+            // Tło logo
+            const logoBackGeometry = new THREE.CircleGeometry(1, 32);
+            const logoBackMaterial = new THREE.MeshStandardMaterial({
+                color: 0x2E86AB,
+                transparent: true,
+                opacity: 0.8,
+                roughness: 0.2,
+                metalness: 0.5,
+                emissive: 0x2E86AB,
+                emissiveIntensity: 0.5
+            });
+            const logoBack = new THREE.Mesh(logoBackGeometry, logoBackMaterial);
+            group.add(logoBack);
+            
+            // Tekst logo
+            createText3D("MedSystem", group, { x: 0, y: 0, z: 0.1 }, 0.3, 0xffffff);
+            createText3D("Ai Pro", group, { x: 0, y: -0.3, z: 0.1 }, 0.2, 0xA23B72);
+            createText3D("1.5", group, { x: 0, y: -0.5, z: 0.1 }, 0.15, 0xffffff);
+            
+            // Efekt świecenia
+            const glowMaterial = new THREE.MeshBasicMaterial({
+                color: 0x2E86AB,
+                transparent: true,
+                opacity: 0.3
+            });
+            const glowGeometry = new THREE.CircleGeometry(1.2, 32);
+            const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+            glow.position.z = -0.1;
+            group.add(glow);
+            
+            logoMesh = group;
+        }
+        
+        // ============================================
+        // TEKST 3D
+        // ============================================
+        
+        function createText3D(text, parent, position, size, color) {
+            // Uproszczona wersja - używamy boxów zamiast prawdziwego tekstu
+            // (dla lepszej wydajności bez zewnętrznych fontów)
+            const group = new THREE.Group();
+            group.position.copy(position);
+            parent.add(group);
+            
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                const charGeometry = new THREE.BoxGeometry(size * 0.6, size, size * 0.2);
+                const charMaterial = new THREE.MeshStandardMaterial({
+                    color: color,
+                    roughness: 0.3,
+                    metalness: 0.5
+                });
+                const charMesh = new THREE.Mesh(charGeometry, charMaterial);
+                charMesh.position.x = (i - text.length / 2) * size * 0.7;
+                group.add(charMesh);
+            }
+        }
+        
+        // ============================================
+        // ANIMACJE
+        // ============================================
+        
+        function setupAnimations() {
+            // Animacja prezenter - gestykulacja
+            animations.presenterWave = createWaveAnimation();
+            animations.presenterPoint = createPointAnimation();
+            animations.presenterStand = createStandAnimation();
+            
+            // Animacja interfejsu - pojawianie się
+            animations.interfaceAppear = createInterfaceAppearAnimation();
+            
+            // Animacja logo - pojawianie się
+            animations.logoAppear = createLogoAppearAnimation();
+            
+            // Animacja kamer
+            animations.cameraIntro = createCameraIntroAnimation();
+            animations.cameraSolution = createCameraSolutionAnimation();
+        }
+        
+        function createWaveAnimation() {
+            return {
+                duration: 2,
+                update: (progress) => {
+                    if (presenter) {
+                        const rightArm = presenter.children.find(c => c.position.x > 0 && c.position.y > 1);
+                        if (rightArm) {
+                            rightArm.rotation.z = -Math.PI / 4 + Math.sin(progress * Math.PI * 2) * 0.3;
+                        }
+                    }
+                }
+            };
+        }
+        
+        function createPointAnimation() {
+            return {
+                duration: 1.5,
+                update: (progress) => {
+                    if (presenter) {
+                        const rightArm = presenter.children.find(c => c.position.x > 0 && c.position.y > 1);
+                        if (rightArm) {
+                            rightArm.rotation.z = -Math.PI / 2 + Math.sin(progress * Math.PI) * 0.1;
+                            rightArm.rotation.x = Math.sin(progress * Math.PI) * 0.2;
+                        }
+                    }
+                }
+            };
+        }
+        
+        function createStandAnimation() {
+            return {
+                duration: 1,
+                update: (progress) => {
+                    if (presenter) {
+                        // Powrót do pozycji wyjściowej
+                        presenter.children.forEach(child => {
+                            if (child.position.y > 1 && Math.abs(child.position.x) > 0.3) {
+                                child.rotation.set(0, 0, 0);
+                                child.position.y = 1.4;
+                            }
+                        });
+                    }
+                }
+            };
+        }
+        
+        function createInterfaceAppearAnimation() {
+            return {
+                duration: 2,
+                update: (progress) => {
+                    if (interfaceMesh) {
+                        interfaceMesh.visible = true;
+                        interfaceMesh.scale.set(progress, progress, progress);
+                        interfaceMesh.position.y = 2 + (1 - progress) * 2;
+                    }
+                }
+            };
+        }
+        
+        function createLogoAppearAnimation() {
+            return {
+                duration: 2,
+                update: (progress) => {
+                    if (logoMesh) {
+                        logoMesh.visible = true;
+                        logoMesh.scale.set(progress, progress, progress);
+                        logoMesh.rotation.y = progress * Math.PI * 2;
+                    }
+                }
+            };
+        }
+        
+        function createCameraIntroAnimation() {
+            return {
+                duration: 3,
+                update: (progress) => {
+                    camera.position.x = Math.sin(progress * Math.PI * 2) * 2;
+                    camera.position.z = 5 + Math.cos(progress * Math.PI * 2) * 2;
+                    camera.lookAt(0, 1, -3);
+                }
+            };
+        }
+        
+        function createCameraSolutionAnimation() {
+            return {
+                duration: 3,
+                update: (progress) => {
+                    camera.position.x = THREE.MathUtils.lerp(0, 4, progress);
+                    camera.position.z = THREE.MathUtils.lerp(5, 2, progress);
+                    camera.position.y = THREE.MathUtils.lerp(2, 3, progress);
+                    camera.lookAt(2, 2, -6);
+                }
+            };
+        }
+        
+        // ============================================
+        // SCENY (SEKWENCJE ANIMACJI)
+        // ============================================
+        
+        const scenes = {
+            intro: {
+                name: "1. Introdukcja",
+                duration: 5,
+                animations: [
+                    animations.cameraIntro,
+                    animations.presenterStand
+                ],
+                onStart: () => {
+                    presenter.visible = true;
+                    interfaceMesh.visible = false;
+                    logoMesh.visible = false;
+                    updateSceneInfo("1. Introdukcja");
+                }
+            },
+            problems: {
+                name: "2. Problemy Medyczne",
+                duration: 4,
+                animations: [
+                    animations.presenterPoint
+                ],
+                onStart: () => {
+                    presenter.visible = true;
+                    interfaceMesh.visible = false;
+                    logoMesh.visible = false;
+                    updateSceneInfo("2. Problemy Medyczne");
+                }
+            },
+            solution: {
+                name: "3. Rozwiązanie - MedSystem",
+                duration: 6,
+                animations: [
+                    animations.cameraSolution,
+                    animations.interfaceAppear,
+                    animations.presenterWave
+                ],
+                onStart: () => {
+                    presenter.visible = true;
+                    interfaceMesh.visible = true;
+                    logoMesh.visible = false;
+                    updateSceneInfo("3. Rozwiązanie - MedSystem");
+                }
+            },
+            features: {
+                name: "4. Funkcjonalności",
+                duration: 5,
+                animations: [
+                    animations.presenterPoint
+                ],
+                onStart: () => {
+                    presenter.visible = true;
+                    interfaceMesh.visible = true;
+                    logoMesh.visible = false;
+                    updateSceneInfo("4. Funkcjonalności");
+                }
+            },
+            benefits: {
+                name: "5. Korzyści",
+                duration: 4,
+                animations: [
+                    animations.presenterWave
+                ],
+                onStart: () => {
+                    presenter.visible = true;
+                    interfaceMesh.visible = false;
+                    logoMesh.visible = true;
+                    updateSceneInfo("5. Korzyści");
+                }
+            },
+            cta: {
+                name: "6. Call to Action",
+                duration: 4,
+                animations: [
+                    animations.logoAppear,
+                    animations.presenterWave
+                ],
+                onStart: () => {
+                    presenter.visible = true;
+                    interfaceMesh.visible = false;
+                    logoMesh.visible = true;
+                    updateSceneInfo("6. Call to Action");
+                }
+            }
+        };
+        
+        function updateSceneInfo(text) {
+            document.getElementById('scene-info').textContent = `Scena: ${text}`;
+        }
+        
+        function playScene(sceneName) {
+            if (scenes[sceneName]) {
+                currentScene = sceneName;
+                const sceneData = scenes[sceneName];
+                sceneData.onStart();
+                
+                isPlaying = true;
+                animationProgress = 0;
+                
+                // Zatrzymaj poprzednie animacje
+                if (mixer) {
+                    mixer.stopAllAction();
+                }
+            }
+        }
+        
+        function resetScene() {
+            isPlaying = false;
+            animationProgress = 0;
+            
+            // Reset pozycji
+            camera.position.set(
+                CONFIG.camera.position.x,
+                CONFIG.camera.position.y,
+                CONFIG.camera.position.z
+            );
+            camera.lookAt(0, 0, 0);
+            
+            // Reset prezenter
+            if (presenter) {
+                presenter.position.set(0, 0, -3);
+                presenter.children.forEach(child => {
+                    child.rotation.set(0, 0, 0);
+                });
+            }
+            
+            // Reset interfejsu i logo
+            if (interfaceMesh) {
+                interfaceMesh.visible = false;
+                interfaceMesh.scale.set(1, 1, 1);
+                interfaceMesh.position.set(2, 2, -6);
+            }
+            
+            if (logoMesh) {
+                logoMesh.visible = false;
+                logoMesh.scale.set(1, 1, 1);
+                logoMesh.rotation.y = 0;
+            }
+            
+            playScene(currentScene);
+        }
+        
+        // ============================================
+        // OBSŁUGA ZDARZEŃ
+        // ============================================
+        
+        function setupEventListeners() {
+            // Zmiana rozmiaru okna
+            window.addEventListener('resize', onWindowResize);
+            
+            // Select sceny
+            document.getElementById('scene-select').addEventListener('change', (e) => {
+                playScene(e.target.value);
+            });
+            
+            // Przyciski
+            document.getElementById('play-btn').addEventListener('click', () => {
+                isPlaying = !isPlaying;
+                document.getElementById('play-btn').textContent = isPlaying ? '⏸ Pauza' : '▶ Odtwórz';
+            });
+            
+            document.getElementById('reset-btn').addEventListener('click', resetScene);
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        // ============================================
+        // ANIMACJA (LOOP)
+        // ============================================
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const delta = clock.getDelta();
+            
+            // Kontrolki orbit
+            controls.update();
+            
+            // Animacje sceny
+            if (isPlaying && scenes[currentScene]) {
+                const sceneData = scenes[currentScene];
+                animationProgress += delta;
+                
+                const progress = Math.min(animationProgress / sceneData.duration, 1);
+                
+                sceneData.animations.forEach(anim => {
+                    anim.update(progress);
+                });
+                
+                // Jeśli animacja się skończyła, zapętl
+                if (animationProgress >= sceneData.duration) {
+                    animationProgress = 0;
+                }
+            }
+            
+            // Obracanie interfejsu
+            if (interfaceMesh && interfaceMesh.visible) {
+                interfaceMesh.rotation.y += delta * 0.1;
+            }
+            
+            // Obracanie logo
+            if (logoMesh && logoMesh.visible) {
+                logoMesh.rotation.y += delta * 0.2;
+            }
+            
+            // Render
+            renderer.render(scene, camera);
+        }
+        
+        // ============================================
+        // START
+        // ============================================
+        
+        init();
+        animate();
+        
+        // Ustaw pierwszą scenę
+        setTimeout(() => {
+            playScene('intro');
+        }, 1000);
+    </script>
+</body>
+</html>
