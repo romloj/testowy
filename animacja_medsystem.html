@@ -186,6 +186,7 @@
         <button id="reset-btn">↻ Zresetuj</button>
     </div>
 
+    <!-- TYLKO JEDNA INSTANCJA THREE.JS - CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -230,10 +231,12 @@
         let animationProgress = 0;
         
         // ============================================
-        // INICJALIZACJA
+        // INICJALIZACJA (wywoływana po załadowaniu DOM)
         // ============================================
         
         function init() {
+            console.log('Inicjalizacja Three.js...');
+            
             // Scena
             scene = new THREE.Scene();
             scene.background = new THREE.Color(CONFIG.colors.background);
@@ -252,7 +255,7 @@
                 CONFIG.camera.position.z
             );
             
-            // Renderer
+            // Renderer - TWORZĘ PRZED OrbitControls!
             renderer = new THREE.WebGLRenderer(CONFIG.renderer);
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -260,16 +263,23 @@
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
             renderer.toneMappingExposure = 1.2;
+            
+            // DODAJ DO BODY - WAŻNE!
             document.body.appendChild(renderer.domElement);
             
-            // Kontrolki orbit
+            // Kontrolki orbit - TARGET USTAWIONY NA PREZENTER (0, 1, -3)
             controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.target.set(0, 1, -3);  // <-- POPRAWKA: Target na prezenter!
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
             controls.screenSpacePanning = false;
             controls.maxPolarAngle = Math.PI / 2 - 0.1;
             controls.minDistance = 2;
             controls.maxDistance = 20;
+            controls.update();
+            
+            // Ustaw kamere, aby patrzyła na prezenter
+            camera.lookAt(0, 1, -3);
             
             // Oświetlenie
             setupLights();
@@ -277,7 +287,7 @@
             // Środowisko
             createEnvironment();
             
-            // Prezenter (uproszczony model)
+            // Prezenter
             createPresenter();
             
             // Interfejs MedSystem
@@ -296,6 +306,8 @@
             setTimeout(() => {
                 document.getElementById('loading').classList.add('hidden');
             }, 1000);
+            
+            console.log('Three.js zainicjalizowany pomyślnie!');
         }
         
         // ============================================
@@ -330,10 +342,6 @@
             const pinkLight = new THREE.PointLight(CONFIG.colors.secondary, 1, 20);
             pinkLight.position.set(5, 5, -5);
             scene.add(pinkLight);
-            
-            // Helpery (tylko w debug)
-            // const lightHelper = new THREE.DirectionalLightHelper(directionalLight, 1);
-            // scene.add(lightHelper);
         }
         
         // ============================================
@@ -424,7 +432,7 @@
                 room.add(chair);
             }
             
-            // Dekoracje - cząsteczki światła
+            // Cząsteczki światła
             createParticles();
         }
         
@@ -469,10 +477,11 @@
         
         function createPresenter() {
             const group = new THREE.Group();
-            group.position.set(0, 0, -3);
+            group.position.set(0, 0, -3);  // POZYCJA: (0, 0, -3)
+            group.castShadow = true;
             scene.add(group);
             
-            // Ciało (uproszczone - walec + sfera)
+            // Ciało
             const bodyGeometry = new THREE.CylinderGeometry(0.3, 0.4, 1.8, 16);
             const bodyMaterial = new THREE.MeshStandardMaterial({
                 color: 0xffffff,
@@ -553,6 +562,7 @@
             group.add(rightShoe);
             
             presenter = group;
+            console.log('Prezenter utworzony na pozycji:', presenter.position);
         }
         
         // ============================================
@@ -617,7 +627,7 @@
             patientArea.position.set(0.7, 0, 0.06);
             group.add(patientArea);
             
-            // Wykres liniowy (animowany)
+            // Wykres liniowy
             createChart(group);
             
             // Przyciski
@@ -720,14 +730,11 @@
         // ============================================
         
         function createText3D(text, parent, position, size, color) {
-            // Uproszczona wersja - używamy boxów zamiast prawdziwego tekstu
-            // (dla lepszej wydajności bez zewnętrznych fontów)
             const group = new THREE.Group();
             group.position.copy(position);
             parent.add(group);
             
             for (let i = 0; i < text.length; i++) {
-                const char = text[i];
                 const charGeometry = new THREE.BoxGeometry(size * 0.6, size, size * 0.2);
                 const charMaterial = new THREE.MeshStandardMaterial({
                     color: color,
@@ -745,18 +752,11 @@
         // ============================================
         
         function setupAnimations() {
-            // Animacja prezenter - gestykulacja
             animations.presenterWave = createWaveAnimation();
             animations.presenterPoint = createPointAnimation();
             animations.presenterStand = createStandAnimation();
-            
-            // Animacja interfejsu - pojawianie się
             animations.interfaceAppear = createInterfaceAppearAnimation();
-            
-            // Animacja logo - pojawianie się
             animations.logoAppear = createLogoAppearAnimation();
-            
-            // Animacja kamer
             animations.cameraIntro = createCameraIntroAnimation();
             animations.cameraSolution = createCameraSolutionAnimation();
         }
@@ -795,7 +795,6 @@
                 duration: 1,
                 update: (progress) => {
                     if (presenter) {
-                        // Powrót do pozycji wyjściowej
                         presenter.children.forEach(child => {
                             if (child.position.y > 1 && Math.abs(child.position.x) > 0.3) {
                                 child.rotation.set(0, 0, 0);
@@ -840,6 +839,8 @@
                     camera.position.x = Math.sin(progress * Math.PI * 2) * 2;
                     camera.position.z = 5 + Math.cos(progress * Math.PI * 2) * 2;
                     camera.lookAt(0, 1, -3);
+                    controls.target.set(0, 1, -3);
+                    controls.update();
                 }
             };
         }
@@ -852,6 +853,8 @@
                     camera.position.z = THREE.MathUtils.lerp(5, 2, progress);
                     camera.position.y = THREE.MathUtils.lerp(2, 3, progress);
                     camera.lookAt(2, 2, -6);
+                    controls.target.set(2, 2, -6);
+                    controls.update();
                 }
             };
         }
@@ -869,10 +872,12 @@
                     animations.presenterStand
                 ],
                 onStart: () => {
-                    presenter.visible = true;
-                    interfaceMesh.visible = false;
-                    logoMesh.visible = false;
+                    if (presenter) presenter.visible = true;
+                    if (interfaceMesh) interfaceMesh.visible = false;
+                    if (logoMesh) logoMesh.visible = false;
                     updateSceneInfo("1. Introdukcja");
+                    controls.target.set(0, 1, -3);
+                    controls.update();
                 }
             },
             problems: {
@@ -882,10 +887,12 @@
                     animations.presenterPoint
                 ],
                 onStart: () => {
-                    presenter.visible = true;
-                    interfaceMesh.visible = false;
-                    logoMesh.visible = false;
+                    if (presenter) presenter.visible = true;
+                    if (interfaceMesh) interfaceMesh.visible = false;
+                    if (logoMesh) logoMesh.visible = false;
                     updateSceneInfo("2. Problemy Medyczne");
+                    controls.target.set(0, 1, -3);
+                    controls.update();
                 }
             },
             solution: {
@@ -897,10 +904,12 @@
                     animations.presenterWave
                 ],
                 onStart: () => {
-                    presenter.visible = true;
-                    interfaceMesh.visible = true;
-                    logoMesh.visible = false;
+                    if (presenter) presenter.visible = true;
+                    if (interfaceMesh) interfaceMesh.visible = true;
+                    if (logoMesh) logoMesh.visible = false;
                     updateSceneInfo("3. Rozwiązanie - MedSystem");
+                    controls.target.set(2, 2, -6);
+                    controls.update();
                 }
             },
             features: {
@@ -910,10 +919,12 @@
                     animations.presenterPoint
                 ],
                 onStart: () => {
-                    presenter.visible = true;
-                    interfaceMesh.visible = true;
-                    logoMesh.visible = false;
+                    if (presenter) presenter.visible = true;
+                    if (interfaceMesh) interfaceMesh.visible = true;
+                    if (logoMesh) logoMesh.visible = false;
                     updateSceneInfo("4. Funkcjonalności");
+                    controls.target.set(2, 2, -6);
+                    controls.update();
                 }
             },
             benefits: {
@@ -923,10 +934,12 @@
                     animations.presenterWave
                 ],
                 onStart: () => {
-                    presenter.visible = true;
-                    interfaceMesh.visible = false;
-                    logoMesh.visible = true;
+                    if (presenter) presenter.visible = true;
+                    if (interfaceMesh) interfaceMesh.visible = false;
+                    if (logoMesh) logoMesh.visible = true;
                     updateSceneInfo("5. Korzyści");
+                    controls.target.set(0, 3, -8);
+                    controls.update();
                 }
             },
             cta: {
@@ -937,16 +950,21 @@
                     animations.presenterWave
                 ],
                 onStart: () => {
-                    presenter.visible = true;
-                    interfaceMesh.visible = false;
-                    logoMesh.visible = true;
+                    if (presenter) presenter.visible = true;
+                    if (interfaceMesh) interfaceMesh.visible = false;
+                    if (logoMesh) logoMesh.visible = true;
                     updateSceneInfo("6. Call to Action");
+                    controls.target.set(0, 3, -8);
+                    controls.update();
                 }
             }
         };
         
         function updateSceneInfo(text) {
-            document.getElementById('scene-info').textContent = `Scena: ${text}`;
+            const sceneInfo = document.getElementById('scene-info');
+            if (sceneInfo) {
+                sceneInfo.textContent = `Scena: ${text}`;
+            }
         }
         
         function playScene(sceneName) {
@@ -958,7 +976,6 @@
                 isPlaying = true;
                 animationProgress = 0;
                 
-                // Zatrzymaj poprzednie animacje
                 if (mixer) {
                     mixer.stopAllAction();
                 }
@@ -969,15 +986,15 @@
             isPlaying = false;
             animationProgress = 0;
             
-            // Reset pozycji
             camera.position.set(
                 CONFIG.camera.position.x,
                 CONFIG.camera.position.y,
                 CONFIG.camera.position.z
             );
-            camera.lookAt(0, 0, 0);
+            camera.lookAt(0, 1, -3);
+            controls.target.set(0, 1, -3);
+            controls.update();
             
-            // Reset prezenter
             if (presenter) {
                 presenter.position.set(0, 0, -3);
                 presenter.children.forEach(child => {
@@ -985,7 +1002,6 @@
                 });
             }
             
-            // Reset interfejsu i logo
             if (interfaceMesh) {
                 interfaceMesh.visible = false;
                 interfaceMesh.scale.set(1, 1, 1);
@@ -1006,21 +1022,27 @@
         // ============================================
         
         function setupEventListeners() {
-            // Zmiana rozmiaru okna
             window.addEventListener('resize', onWindowResize);
             
-            // Select sceny
-            document.getElementById('scene-select').addEventListener('change', (e) => {
-                playScene(e.target.value);
-            });
+            const sceneSelect = document.getElementById('scene-select');
+            if (sceneSelect) {
+                sceneSelect.addEventListener('change', (e) => {
+                    playScene(e.target.value);
+                });
+            }
             
-            // Przyciski
-            document.getElementById('play-btn').addEventListener('click', () => {
-                isPlaying = !isPlaying;
-                document.getElementById('play-btn').textContent = isPlaying ? '⏸ Pauza' : '▶ Odtwórz';
-            });
+            const playBtn = document.getElementById('play-btn');
+            if (playBtn) {
+                playBtn.addEventListener('click', () => {
+                    isPlaying = !isPlaying;
+                    playBtn.textContent = isPlaying ? '⏸ Pauza' : '▶ Odtwórz';
+                });
+            }
             
-            document.getElementById('reset-btn').addEventListener('click', resetScene);
+            const resetBtn = document.getElementById('reset-btn');
+            if (resetBtn) {
+                resetBtn.addEventListener('click', resetScene);
+            }
         }
         
         function onWindowResize() {
@@ -1038,10 +1060,10 @@
             
             const delta = clock.getDelta();
             
-            // Kontrolki orbit
-            controls.update();
+            if (controls) {
+                controls.update();
+            }
             
-            // Animacje sceny
             if (isPlaying && scenes[currentScene]) {
                 const sceneData = scenes[currentScene];
                 animationProgress += delta;
@@ -1052,37 +1074,35 @@
                     anim.update(progress);
                 });
                 
-                // Jeśli animacja się skończyła, zapętl
                 if (animationProgress >= sceneData.duration) {
                     animationProgress = 0;
                 }
             }
             
-            // Obracanie interfejsu
             if (interfaceMesh && interfaceMesh.visible) {
                 interfaceMesh.rotation.y += delta * 0.1;
             }
             
-            // Obracanie logo
             if (logoMesh && logoMesh.visible) {
                 logoMesh.rotation.y += delta * 0.2;
             }
             
-            // Render
-            renderer.render(scene, camera);
+            if (renderer) {
+                renderer.render(scene, camera);
+            }
         }
         
         // ============================================
-        // START
+        // START (wywoływany po załadowaniu DOM)
         // ============================================
         
-        init();
-        animate();
-        
-        // Ustaw pierwszą scenę
-        setTimeout(() => {
+        console.log('Czekam na załadowanie DOM...');
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM załadowany. Inicjuję animację...');
+            init();
+            animate();
             playScene('intro');
-        }, 1000);
+        });
     </script>
 </body>
 </html>
