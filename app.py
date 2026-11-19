@@ -17839,7 +17839,10 @@ def journal_reminder_schedule_get():
         **cfg,
         'day_of_week_name': _DOW_NAMES[cfg['day_of_week']],
         'next_run': next_run.isoformat() if next_run else None,
-        'scheduler_thread_alive': bool(_journal_reminder_thread and _journal_reminder_thread.is_alive()),
+        'scheduler_thread_alive': bool(
+            (_journal_reminder_thread and _journal_reminder_thread.is_alive())
+            or (_firma_reminder_thread and _firma_reminder_thread.is_alive())
+        ),
     }), 200
 
 
@@ -18074,23 +18077,26 @@ def update_journal_reminder_settings():
 def _get_missing_journal_entries_for_firma(firma_id):
     """
     Zwraca listę stringów opisujących BRAKUJĄCE wpisy w dzienniku.
-    Sesja 'therapy' ze statusem 'done' bez rekordu w journal_entries
+    Sesja 'therapy' ze statusem 'done' bez rekordu w tabeli dziennik
     w ostatnich 14 dniach.
     """
     with session_scope() as db:
         rows = db.execute(
             text("""
-                SELECT s.id, s.starts_at, c.full_name AS client_name
+                SELECT s.id, s.starts_at, s.therapist_id, t.full_name AS therapist_name, c.full_name AS client_name
                 FROM schedule_slots s
                 JOIN clients c ON c.id = s.client_id
-                LEFT JOIN journal_entries j
-                  ON j.client_id  = s.client_id
-                 AND j.firma_id   = s.firma_id
-                 AND j.entry_date = s.starts_at::date
+                JOIN therapists t ON t.id = s.therapist_id
+                LEFT JOIN dziennik d
+                  ON d.therapist_id = s.therapist_id
+                 AND d.client_id    = s.client_id
+                 AND d.firma_id     = s.firma_id
+                 AND d.data = (s.starts_at AT TIME ZONE 'Europe/Warsaw')::date
                 WHERE s.firma_id = :fid
                   AND s.kind     = 'therapy'
                   AND s.status   = 'done'
-                  AND j.id IS NULL
+                  AND s.therapist_id IS NOT NULL
+                  AND d.id IS NULL
                   AND s.starts_at >= (NOW() - INTERVAL '14 days')
                 ORDER BY s.starts_at DESC
             """),
@@ -18208,6 +18214,46 @@ def get_firms_to_remind_now(now_warsaw=None):
     return result
 
 
+def run_firma_journal_reminder_job():
+    """
+    Wysyła zbiorcze maile o zaległościach w dzienniku do adminów podmiotów,
+    zgodnie z częstotliwością ustawioną per podmiot (FirmaSettings / tabela firma_settings,
+    edytowalna z dashboardu przez /api/admin/firma-settings/journal-reminder).
+    Wywoływane cyklicznie przez wątek _firma_reminder_scheduler_loop.
+    """
+    try:
+        pairs = get_firms_to_remind_now()
+    except Exception as e:
+        print(f"❌ Scheduler dziennika (ustawienia podmiotów): błąd pobierania podmiotów: {e}")
+        traceback.print_exc()
+        return {'error': str(e)}
+    sent = 0
+    for firma_id, settings_row in pairs:
+        try:
+            _send_journal_reminder_for_firma(firma_id, settings_row)
+            sent += 1
+        except Exception as e:
+            print(f"❌ Scheduler dziennika (ustawienia podmiotów): błąd dla firma_id={firma_id}: {e}")
+            traceback.print_exc()
+    if pairs:
+        print(f"⏰ Scheduler dziennika (ustawienia podmiotów): wysyłka dla {sent}/{len(pairs)} podmiotów.")
+    return {'firms': len(pairs), 'sent': sent}
+
+
+def _firma_reminder_scheduler_loop():
+    """Pętla wątku: co 5 minut sprawdza, czy któryś podmiot ma zaplanowaną wysyłkę (dzień+godzina), i wysyła."""""
+    while True:
+        try:
+            run_firma_journal_reminder_job()
+        except Exception as e:
+            print(f"❌ Błąd w pętli schedulera (ustawienia podmiotów): {e}")
+            traceback.print_exc()
+        sleep(300)
+
+
+_firma_reminder_thread = None
+
+
 
 
 
@@ -18255,17 +18301,26 @@ def inject_journal_warning():
 
 
 def start_journal_reminder_scheduler():
-    """Startuje (jednorazowo, idempotentnie) wątek schedulera — piątek 9:00 Europe/Warsaw."""
-    global _journal_reminder_thread
-    if _journal_reminder_thread is not None and _journal_reminder_thread.is_alive():
-        return _journal_reminder_thread
-    _journal_reminder_thread = threading.Thread(
-        target=_journal_reminder_scheduler_loop,
-        name='journal-reminder-scheduler',
-        daemon=True
-    )
-    _journal_reminder_thread.start()
-    print("✓ Scheduler przypomnień o dzienniku zajęć uruchomiony (każdy piątek 9:00 Europe/Warsaw).")
+    """Startuje (jednorazowo, idempotentnie) dwa wątki schedulera:
+    1) przypomnienia do terapeutów wg globalnego harmonogramu (domyślnie piątek 9:00),
+    2) zbiorcze maile do adminów wg częstotliwości ustawionej per podmiot (firma_settings)."""
+    global _journal_reminder_thread, _firma_reminder_thread
+    if _journal_reminder_thread is None or not _journal_reminder_thread.is_alive():
+        _journal_reminder_thread = threading.Thread(
+            target=_journal_reminder_scheduler_loop,
+            name='journal-reminder-scheduler',
+            daemon=True
+        )
+        _journal_reminder_thread.start()
+        print("✓ Scheduler przypomnień o dzienniku zajęć uruchomiony (każdy piątek 9:00 Europe/Warsaw).")
+    if _firma_reminder_thread is None or not _firma_reminder_thread.is_alive():
+        _firma_reminder_thread = threading.Thread(
+            target=_firma_reminder_scheduler_loop,
+            name='firma-reminder-scheduler',
+            daemon=True
+        )
+        _firma_reminder_thread.start()
+        print("✓ Scheduler przypomnień (ustawienia podmiotów) uruchomiony (kontrola co 5 minut).")
     return _journal_reminder_thread
 
 

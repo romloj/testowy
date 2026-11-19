@@ -152,6 +152,24 @@
     </div>
     {% endif %}
 
+    {% if is_admin or is_secretariat or current_user.has_permission('dziennik') %}
+    <div class="row mb-4" id="missingJournalSection">
+        <div class="col-12"><h6 class="text-uppercase text-secondary fw-bold mb-3 small ls-1"><i class="bi bi-journal-exclamation me-2"></i>Zaległe dzienniki zajęć (ostatnie 7 dni)</h6></div>
+        <div class="col-12">
+            <div class="card card-status">
+                <div class="card-header text-danger d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <span>Terapeuci bez wpisu w dzienniku</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-danger-subtle text-danger rounded-pill" id="missingJournalCount">0</span>
+                        <button class="btn btn-sm btn-outline-dark fw-bold" id="missingJournalRemindBtn" onclick="window.remindMissingJournal()" title="Wysyła e-maile z przypomnieniem do terapeutów z listy"><i class="bi bi-envelope-fill me-1"></i> Wyślij przypomnienia</button>
+                    </div>
+                </div>
+                <div class="card-body p-0"><div id="missingJournalList" class="list-group list-group-flush small overflow-auto" style="max-height:250px"></div></div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- SEKCJA MOJE SKRÓTY -->
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <h6 class="text-uppercase text-secondary fw-bold mb-0 small ls-1"><i class="bi bi-star-fill text-warning me-2"></i>Moje Skróty (Szybki Dostęp)</h6>
@@ -525,6 +543,7 @@
     const CURRENT_USER = {
         isAdmin: "{{ 'true' if is_admin else 'false' }}" === "true",
         canManageAbsences: "{{ 'true' if is_admin or is_secretariat or (current_user and current_user.has_permission and current_user.has_permission('manage_absences')) else 'false' }}" === "true",
+        canManageJournalReminders: "{{ 'true' if (is_admin or is_secretariat or (current_user and current_user.has_permission and current_user.has_permission('dziennik'))) else 'false' }}" === "true",
         therapistId: parseInt("{{ therapist_id if therapist_id is not none else '' }}", 10) || null,
         driverId: parseInt("{{ driver_id if driver_id is not none else '' }}", 10) || null,
         fullName: "{{ current_user.full_name if current_user and current_user.full_name else 'Użytkownik' }}"
@@ -1080,6 +1099,66 @@
         }
     };
 
+    window.loadMissingJournalPanel = async function() {
+        const listEl = document.getElementById('missingJournalList');
+        const countEl = document.getElementById('missingJournalCount');
+        if (!listEl) return;
+        try {
+            const res = await fetch('/api/dziennik/missing-entries?days=7&statuses=done');
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+            const therapists = data.therapists || [];
+            if (countEl) countEl.textContent = String(data.total_missing || 0);
+            if (!therapists.length) {
+                listEl.innerHTML = '<div class="text-center py-4 text-muted small"><i class="bi bi-check-circle-fill text-success me-1"></i>Wszyscy terapeuci uzupełnili dziennik — brak zaległości za ostatnie 7 dni</div>';
+                return;
+            }
+            listEl.innerHTML = therapists.map(t => {
+                const n = t.missing ? t.missing.length : 0;
+                const zlecenia = n === 1 ? '1 zajęcie' : (n < 5 ? n + ' zajęcia' : n + ' zajęć');
+                const examples = t.missing.slice(0, 3)
+                    .map(m => esc((m.date || '') + ' — ' + (m.client_name || ('klient #' + m.client_id))))
+                    .join('; ') + (n > 3 ? '…' : '');
+                return `<div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div class="me-2">
+                                <span class="fw-bold text-dark">${esc(t.therapist_name || ('Terapeuta #' + t.therapist_id))}</span>
+                                <span class="text-muted small">— ${zlecenia} bez wpisu</span>
+                                <div class="text-muted" style="font-size: 0.78rem;">${examples}</div>
+                            </div>
+                            <span class="badge bg-danger rounded-pill">${t.missing_count}</span>
+                        </div>`;
+            }).join('');
+        } catch (e) {
+            console.error(e);
+            listEl.innerHTML = `<div class="text-center py-3 text-muted small">Nie udało się pobrać zaległości: ${esc(e.message)}</div>`;
+        }
+    };
+
+    window.remindMissingJournal = async function() {
+        if (!confirm('Wysłać e-maile z przypomnieniem do terapeutów z zaległymi dziennikami?')) return;
+        const btn = document.getElementById('missingJournalRemindBtn');
+        if (btn) btn.disabled = true;
+        try {
+            const res = await fetch('/api/dziennik/remind-therapists', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ days: 7, statuses: 'done' })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) {
+                alert('Wysłano ' + (data.sent || 0) + ' przypomnień (brakujące wpisy: ' + (data.missing_total || 0) + ').');
+                window.loadMissingJournalPanel();
+            } else {
+                alert('Błąd wysyłki: ' + (data.error || ('HTTP ' + res.status)));
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Błąd połączenia z serwerem');
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    };
+
     window.openEditSlotModal = function(slotId) {
         if (!_dashboardData) return;
 
@@ -1390,6 +1469,7 @@
         await loadModuleVisibility();
         loadDashboardData();
         loadUserPreferences();
+        loadMissingJournalPanel();
     });
 </script>
 </body>
