@@ -17500,9 +17500,29 @@ def _find_missing_journal_entries(firma_id, days, statuses=None):
           )
     """)
 
+    noentry_sql = text("""
+        SELECT t.id AS therapist_id,
+               t.full_name AS therapist_name,
+               t.email AS therapist_email
+        FROM therapists t
+        WHERE t.firma_id = :fid
+          AND t.active IS TRUE
+          AND COALESCE(t.email, '') <> ''
+          AND NOT EXISTS (
+              SELECT 1
+              FROM dziennik d
+              WHERE d.firma_id = :fid
+                AND d.therapist_id = t.id
+                AND d.data >= :since
+                AND d.data < :today
+          )
+        ORDER BY t.full_name
+    """)
+
     with engine.connect() as conn:
         rows = list(conn.execute(sql, params).mappings().all())
         rows += list(conn.execute(tus_sql, params).mappings().all())
+        noentry_rows = list(conn.execute(noentry_sql, params).mappings().all())
 
     therapists = {}
     for r in rows:
@@ -17520,6 +17540,21 @@ def _find_missing_journal_entries(firma_id, days, statuses=None):
             'client_id': r['client_id'],
             'client_name': r['client_name']
         })
+    for r in noentry_rows:
+        if r['therapist_id'] in therapists:
+            continue
+        therapists[r['therapist_id']] = {
+            'therapist_id': r['therapist_id'],
+            'therapist_name': r['therapist_name'],
+            'email': r['therapist_email'],
+            'missing_count': 1,
+            'missing': [{
+                'slot_id': None,
+                'date': None,
+                'client_id': None,
+                'client_name': 'BRAK JAKIEGOKOLWIEK wpisu w dzienniku w tym okresie'
+            }]
+        }
     return list(therapists.values())
 
 
@@ -18153,6 +18188,24 @@ def _get_missing_journal_entries_for_firma(firma_id):
             ORDER BY ts.session_date DESC
         """), {"fid": firma_id}).mappings().all()
 
+        today14 = datetime.now(TZ).date()
+        since14 = today14 - timedelta(days=14)
+        noentry_rows = db.execute(text("""
+            SELECT t.full_name AS therapist_name
+            FROM therapists t
+            WHERE t.firma_id = :fid
+              AND t.active IS TRUE
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM dziennik d
+                  WHERE d.firma_id = :fid
+                    AND d.therapist_id = t.id
+                    AND d.data >= :since
+                    AND d.data < :today
+              )
+            ORDER BY t.full_name
+        """), {"fid": firma_id, "since": since14, "today": today14}).mappings().all()
+
         return (
             [
                 f"{r['starts_at'].strftime('%Y-%m-%d %H:%M')} — {r['client_name']}"
@@ -18161,6 +18214,10 @@ def _get_missing_journal_entries_for_firma(firma_id):
             + [
                 f"{r['session_date'].isoformat()} — {r['client_name']} (zajęcia grupowe TUS)"
                 for r in tus_rows
+            ]
+            + [
+                f"Terapeuta {r['therapist_name']} — BRAK JAKIEGOKOLWIEK wpisu w dzienniku w ostatnich 14 dniach"
+                for r in noentry_rows
             ]
         )
 
