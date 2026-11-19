@@ -374,11 +374,7 @@
                         <label class="form-label small fw-bold mb-1">Zakres dni wstecz</label>
                         <input type="number" id="jrDays" class="form-control form-control-sm" min="1" max="90" value="7">
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label small fw-bold mb-1">Statusy sprawdzanych zajęć</label>
-                        <input type="text" id="jrStatuses" class="form-control form-control-sm" placeholder="puste = wszystkie poza anulowanymi" value="">
-                    </div>
-                    <div class="col-md-6 d-flex align-items-end">
+                    <div class="col-md-8 d-flex align-items-end">
                         <button type="button" class="btn btn-sm btn-dark fw-bold" onclick="window.saveJournalReminderSchedule()">
                             <i class="bi bi-save me-1"></i> Zapisz harmonogram
                         </button>
@@ -395,11 +391,7 @@
                         <label class="form-label small fw-bold mb-1">Zakres dni</label>
                         <input type="number" id="jrPreviewDays" class="form-control form-control-sm" min="1" max="90" value="7">
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label small fw-bold mb-1">Statusy zajęć</label>
-                        <input type="text" id="jrPreviewStatuses" class="form-control form-control-sm" placeholder="puste = wszystkie poza anulowanymi" value="">
-                    </div>
-                    <div class="col-md-5 d-flex align-items-end">
+                    <div class="col-md-9 d-flex align-items-end">
                         <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="window.loadMissingEntriesPreview()">
                             <i class="bi bi-search me-1"></i> Sprawdź braki
                         </button>
@@ -973,7 +965,6 @@
                 document.getElementById('jrHourG').value = String(c.hour);
                 document.getElementById('jrMinute').value = String(c.minute);
                 document.getElementById('jrDays').value = String(c.days);
-                document.getElementById('jrStatuses').value = c.statuses || '';
                 document.getElementById('jrScheduleInfo').textContent =
                     'Nast\u0119pny automatyczny bieg: ' + (c.next_run ? String(c.next_run).replace('T', ' ').substring(0, 16) : 'automat wy\u0142\u0105czony')
                     + ' \u2014 automat ' + (c.enabled ? 'w\u0142\u0105czony' : 'wy\u0142\u0105czony')
@@ -1022,8 +1013,7 @@
             day_of_week: parseInt(document.getElementById('jrDow').value, 10),
             hour: parseInt(document.getElementById('jrHourG').value, 10),
             minute: parseInt(document.getElementById('jrMinute').value, 10),
-            days: parseInt(document.getElementById('jrDays').value, 10),
-            statuses: document.getElementById('jrStatuses').value
+            days: parseInt(document.getElementById('jrDays').value, 10)
         };
         try {
             const res = await fetch('/api/admin/journal-reminder-schedule', {
@@ -1065,9 +1055,8 @@
         if (!box) return;
         box.innerHTML = '<div class="text-muted small"><i class="bi bi-hourglass-split me-1"></i> Sprawdzam braki...</div>';
         const days = document.getElementById('jrPreviewDays').value || 7;
-        const statuses = document.getElementById('jrPreviewStatuses').value;
         try {
-            const res = await fetch(`/api/dziennik/missing-entries?days=${encodeURIComponent(days)}${statuses ? '&statuses=' + encodeURIComponent(statuses) : ''}`);
+            const res = await fetch(`/api/dziennik/missing-entries?days=${encodeURIComponent(days)}`);
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
             if (!data.therapists || !data.therapists.length) {
