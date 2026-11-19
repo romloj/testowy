@@ -17478,8 +17478,38 @@ def _find_missing_journal_entries(firma_id, days, statuses=None):
         ORDER BY dzien DESC, therapist_name, client_name
     """)
 
+    tus_sql = text("""
+        SELECT ts.id || '-tus' AS slot_id,
+               g.therapist_id,
+               t.full_name AS therapist_name,
+               t.email AS therapist_email,
+               a.client_id,
+               c.full_name AS client_name,
+               ts.session_date AS dzien
+        FROM tus_sessions ts
+        JOIN tus_groups g ON g.id = ts.group_id
+        JOIN therapists t ON t.id = g.therapist_id
+        JOIN tus_session_attendance a ON a.session_id = ts.id
+        LEFT JOIN clients c ON c.id = a.client_id
+        WHERE ts.firma_id = :fid
+          AND g.therapist_id IS NOT NULL
+          AND LOWER(a.status) IN ('obecny', 'spóźniony')
+          AND ts.firma_id = g.firma_id
+          AND ts.session_date >= :since
+          AND ts.session_date < :today
+          AND NOT EXISTS (
+              SELECT 1
+              FROM dziennik d
+              WHERE d.firma_id = :fid
+                AND d.therapist_id = g.therapist_id
+                AND d.client_id = a.client_id
+                AND d.data = ts.session_date
+          )
+    """)
+
     with engine.connect() as conn:
-        rows = conn.execute(sql, params).mappings().all()
+        rows = list(conn.execute(sql, params).mappings().all())
+        rows += list(conn.execute(tus_sql, params).mappings().all())
 
     therapists = {}
     for r in rows:
@@ -18110,10 +18140,37 @@ def _get_missing_journal_entries_for_firma(firma_id):
             {"fid": firma_id},
         ).mappings().all()
 
-        return [
-            f"{r['starts_at'].strftime('%Y-%m-%d %H:%M')} — {r['client_name']}"
-            for r in rows
-        ]
+        tus_rows = db.execute(text("""
+            SELECT ts.session_date, c.full_name AS client_name
+            FROM tus_sessions ts
+            JOIN tus_groups g ON g.id = ts.group_id
+            JOIN tus_session_attendance a ON a.session_id = ts.id
+            LEFT JOIN clients c ON c.id = a.client_id
+            WHERE ts.firma_id = :fid
+              AND ts.firma_id = g.firma_id
+              AND g.therapist_id IS NOT NULL
+              AND LOWER(a.status) IN ('obecny', 'spóźniony')
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM dziennik d
+                  WHERE d.firma_id = :fid
+                    AND d.therapist_id = g.therapist_id
+                    AND d.client_id = a.client_id
+                    AND d.data = ts.session_date
+              )
+            ORDER BY ts.session_date DESC
+        """), {"fid": firma_id}).mappings().all()
+
+        return (
+            [
+                f"{r['starts_at'].strftime('%Y-%m-%d %H:%M')} — {r['client_name']}"
+                for r in rows
+            ]
+            + [
+                f"{r['session_date'].isoformat()} — {r['client_name']} (zajęcia grupowe TUS)"
+                for r in tus_rows
+            ]
+        )
 
 
 def _send_journal_reminder_for_firma(firma_id, settings_row):
