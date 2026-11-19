@@ -1150,7 +1150,11 @@
             });
             const data = await res.json().catch(() => ({}));
             if (res.ok) {
-                alert('Wysłano ' + (data.sent || 0) + ' przypomnień (brakujące wpisy: ' + (data.missing_total || 0) + ').');
+                let msg = 'Wysłano ' + (data.sent || 0) + ' z ' + (data.therapists_with_missing || 0)
+                    + ' przypomnień (brakujące wpisy: ' + (data.missing_total || 0) + ').';
+                if (data.no_email) msg += '\nBez adresu e-mail (pominięto): ' + data.no_email + ' — uzupełnij e-mail terapeuty w kartotece.';
+                if (data.failed) msg += '\nNieudane wysyłki: ' + data.failed + ' — sprawdź konfigurację SMTP i Logi Systemowe.';
+                alert(msg);
                 window.loadMissingJournalPanel();
             } else {
                 alert('Błąd wysyłki: ' + (data.error || ('HTTP ' + res.status)));

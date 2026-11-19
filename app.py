@@ -17958,6 +17958,9 @@ def dziennik_remind_therapists():
     days = _parse_days(data.get('days', request.args.get('days')), default=7)
     statuses = data.get('statuses', request.args.get('statuses'))
     dry_run = bool(data.get('dry_run', False)) or request.args.get('dry_run') in ('1', 'true', 'True')
+    if not SMTP_PASSWORD:
+        return jsonify({'error': 'Wysyłka e-mail nie działa — w konfiguracji serwera (Render → Environment) brakuje zmiennej SMTP_PASSWORD (hasło aplikacji Gmail).'}), 503
+
     firma_id = session.get('firma_id', 1)
 
     journal_url = request.host_url.rstrip('/') + '/klient_panel/dziennik'
@@ -18034,12 +18037,13 @@ def _send_journal_reminders_for_firma(firma_id, days=7, statuses=None, dry_run=F
             stats['would_send'] += 1
             print(f"🧪 DRY RUN — przypomnienie do {email} ({t['missing_count']} wpisów): {subject}")
         else:
-            try:
-                send_email_async(email, subject, body)
+            if send_email_sync(email, subject, body):
                 stats['sent'] += 1
-            except Exception as e:
+                print(f"✅ Przypomnienie dziennika wysłane do: {email}")
+            else:
                 stats['failed'] += 1
-                print(f"❌ Błąd wysyłki przypomnienia do {email}: {e}")
+                print(f"❌ Niepowodzenie wysyłki przypomnienia do {email}"
+                      f" (sprawdź SMTP_PASSWORD / logi MAIL_BLAD)")
 
     return stats, therapists
 
