@@ -1060,7 +1060,11 @@
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
             if (!data.therapists || !data.therapists.length) {
-                box.innerHTML = '<div class="alert alert-success small mb-0"><i class="bi bi-check-circle-fill me-1"></i> Brak zaleg\u0142ych wpis\u00f3w \u2014 wszystko uzupe\u0142nione \u2713</div>';
+                const dg = data.diagnostics;
+                box.innerHTML = (dg
+                    ? `<div class="text-muted small mb-1">Diagnostyka: terapeut\u00f3w w podmiocie: <strong>${dg.therapists_total}</strong> (firma ${dg.firma_id}); z wpisami w okresie: <strong>${dg.therapists_with_entries}</strong>; zaleg\u0142ych: <strong>${dg.therapists_missing}</strong>.</div>`
+                    : '')
+                    + '<div class="alert alert-success small mb-0"><i class="bi bi-check-circle-fill me-1"></i> Brak zaleg\u0142ych wpis\u00f3w \u2014 wszystko uzupe\u0142nione \u2713</div>';
                 return;
             }
             const groups = data.therapists.map(t => {
@@ -1076,7 +1080,11 @@
                             <ul class="ps-4 mb-0 mt-1">${items}</ul>
                         </div>`;
             }).join('');
-            box.innerHTML = `
+            const dia = data.diagnostics;
+            const diaLine = dia
+                ? `<div class="text-muted mb-1" style="font-size:0.74rem;">Diagnostyka: terapeut\u00f3w w podmiocie: <strong>${dia.therapists_total}</strong> (firma ${dia.firma_id}); z wpisami w okresie: <strong>${dia.therapists_with_entries}</strong>.</div>`
+                : '';
+            box.innerHTML = diaLine + `
                 <div class="alert alert-warning small py-2 mb-2">
                     <i class="bi bi-exclamation-triangle-fill me-1"></i>
                     <strong>${data.total_missing}</strong> brakuj\u0105cych wpis\u00f3w u <strong>${data.therapists.length}</strong> terapeut\u00f3w.
@@ -1098,11 +1106,16 @@
             if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
             const therapists = data.therapists || [];
             if (countEl) countEl.textContent = String(data.total_missing || 0);
+            const diag = data.diagnostics;
+            const diagLine = diag
+                ? `<div class="px-2 py-1 border-bottom text-muted" style="font-size:0.74rem;">Diagnostyka: terapeutów w podmiocie: <strong>${diag.therapists_total}</strong> (firma ${diag.firma_id}); z wpisami w okresie: <strong>${diag.therapists_with_entries}</strong>; zaległych: <strong>${diag.therapists_missing}</strong>.</div>`
+                : '';
             if (!therapists.length) {
-                listEl.innerHTML = '<div class="text-center py-4 text-muted small"><i class="bi bi-check-circle-fill text-success me-1"></i>Wszyscy terapeuci uzupełnili dziennik — brak zaległości za ostatnie 7 dni</div>';
+                listEl.innerHTML = diagLine ||
+                '<div class="text-center py-4 text-muted small"><i class="bi bi-check-circle-fill text-success me-1"></i>Wszyscy terapeuci uzupełnili dziennik — brak zaległości za ostatnie 7 dni</div>';
                 return;
             }
-            listEl.innerHTML = therapists.map(t => {
+            listEl.innerHTML = diagLine + therapists.map(t => {
                 const n = t.missing ? t.missing.length : 0;
                 const zlecenia = n === 1 ? '1 zajęcie' : (n < 5 ? n + ' zajęcia' : n + ' zajęć');
                 const examples = t.missing.slice(0, 3)
