@@ -17563,8 +17563,10 @@ def dziennik_missing_entries():
     Podgląd brakujących wpisów w dzienniku zajęć (bez wysyłki e-mail).
     Parametry: ?days=7 (1-90), ?statuses=done,confirmed (puste = wszystkie poza anulowanymi)
     """
-    if not _can_manage_journal_reminders():
-        return jsonify({'error': 'Brak uprawnień (wymagany admin, sekretariat lub uprawnienie "dziennik").'}), 403
+    full_view = bool(current_user and current_user.is_admin)
+    own_therapist_id = getattr(current_user, 'therapist_id', None) if current_user else None
+    if not full_view and not own_therapist_id:
+        return jsonify({'error': 'Brak uprawnień — tylko administrator widzi wszystkich; Twoje konto nie jest powiązane z terapeutą.'}), 403
 
     days = _parse_days(request.args.get('days'), default=7)
     statuses = request.args.get('statuses')
@@ -17572,6 +17574,8 @@ def dziennik_missing_entries():
 
     try:
         result = _find_missing_journal_entries(firma_id, days, statuses)
+        if not full_view:
+            result = [t for t in result if t['therapist_id'] == own_therapist_id]
         total = sum(t['missing_count'] for t in result)
         today = datetime.now(TZ).date()
         since = today - timedelta(days=days)
@@ -17585,18 +17589,21 @@ def dziennik_missing_entries():
                      "WHERE d.firma_id = :fid AND d.data >= :since AND d.data < :today"),
                 {'fid': firma_id, 'since': since, 'today': today}
             ).scalar() or 0
-        return jsonify({
+        resp = {
             'days': days,
             'statuses': 'wszystkie (status ignorowany)',
             'total_missing': total,
             'therapists': result,
-            'diagnostics': {
+            'full_view': full_view
+        }
+        if full_view:
+            resp['diagnostics'] = {
                 'firma_id': firma_id,
                 'therapists_total': int(therapists_total),
                 'therapists_with_entries': int(therapists_with_entries),
                 'therapists_missing': len(result)
             }
-        }), 200
+        return jsonify(resp), 200
     except Exception as e:
         print(f"❌ Błąd pobierania brakujących wpisów dziennika: {e}")
         traceback.print_exc()
@@ -17705,9 +17712,10 @@ def dziennik_remind_therapists():
     w dzienniku zajęć dla odbytych zajęć bez wpisu (dla bieżącego podmiotu z sesji).
     Body (opcjonalnie): {"days": 7, "statuses": "done,confirmed", "dry_run": false}
     (puste 'statuses' = wszystkie odbyte zajęcia poza anulowanymi)
+    TYLKO ADMINISTRATOR.
     """
-    if not _can_manage_journal_reminders():
-        return jsonify({'error': 'Brak uprawnień (wymagany admin, sekretariat lub uprawnienie "dziennik").'}), 403
+    if not (current_user and current_user.is_admin):
+        return jsonify({'error': 'Tylko administrator może wysyłać przypomnienia.'}), 403
 
     data = request.get_json(silent=True) or {}
     days = _parse_days(data.get('days', request.args.get('days')), default=7)

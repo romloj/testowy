@@ -158,10 +158,10 @@
         <div class="col-12">
             <div class="card card-status">
                 <div class="card-header text-danger d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <span>Terapeuci bez wpisu w dzienniku</span>
+                    <span>{% if is_admin %}Terapeuci bez wpisu w dzienniku{% else %}Twoje zaległe wpisy w dzienniku{% endif %}</span>
                     <div class="d-flex align-items-center gap-2">
                         <span class="badge bg-danger-subtle text-danger rounded-pill" id="missingJournalCount">0</span>
-                        <button class="btn btn-sm btn-outline-dark fw-bold" id="missingJournalRemindBtn" onclick="window.remindMissingJournal()" title="Wysyła e-maile z przypomnieniem do terapeutów z listy"><i class="bi bi-envelope-fill me-1"></i> Wyślij przypomnienia</button>
+                        {% if is_admin %}<button class="btn btn-sm btn-outline-dark fw-bold" id="missingJournalRemindBtn" onclick="window.remindMissingJournal()" title="Wysyła e-maile z przypomnieniem do terapeutów z listy"><i class="bi bi-envelope-fill me-1"></i> Wyślij przypomnienia</button>{% endif %}
                     </div>
                 </div>
                 <div class="card-body p-0"><div id="missingJournalList" class="list-group list-group-flush small overflow-auto" style="max-height:250px"></div></div>
@@ -535,7 +535,7 @@
     const CURRENT_USER = {
         isAdmin: "{{ 'true' if is_admin else 'false' }}" === "true",
         canManageAbsences: "{{ 'true' if is_admin or is_secretariat or (current_user and current_user.has_permission and current_user.has_permission('manage_absences')) else 'false' }}" === "true",
-        canManageJournalReminders: "{{ 'true' if (is_admin or is_secretariat or (current_user and current_user.has_permission and current_user.has_permission('dziennik'))) else 'false' }}" === "true",
+        canManageJournalReminders: "{{ 'true' if is_admin else 'false' }}" === "true",
         therapistId: parseInt("{{ therapist_id if therapist_id is not none else '' }}", 10) || null,
         driverId: parseInt("{{ driver_id if driver_id is not none else '' }}", 10) || null,
         fullName: "{{ current_user.full_name if current_user and current_user.full_name else 'Użytkownik' }}"
@@ -1137,6 +1137,7 @@
     };
 
     window.remindMissingJournal = async function() {
+        if (!CURRENT_USER.canManageJournalReminders) { alert('Tylko administrator może wysyłać przypomnienia.'); return; }
         if (!confirm('Wysłać e-maile z przypomnieniem do terapeutów z zaległymi dziennikami?')) return;
         const btn = document.getElementById('missingJournalRemindBtn');
         if (btn) btn.disabled = true;
