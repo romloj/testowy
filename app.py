@@ -17450,16 +17450,24 @@ def _parse_statuses(value, default=None):
     return [s.strip() for s in str(value).split(',') if s.strip()]
 
 
-def _find_missing_journal_entries(firma_id, days, statuses=None):
+def _find_missing_journal_entries(firma_id, days, statuses=None, date_from=None, date_to=None):
     """
     Znajduje przeszłe zajęcia (schedule_slots, kind='therapy') bez wpisu w dzienniku
     (dziennik.data = dzień zajęć). Status zajęć jest ignorowany — dziennik nie zależy
     od statusu sesji; liczone są wszystkie zaplanowane w przeszłości zajęcia.
     Parametr 'statuses' pozostaje w sygnaturze dla kompatybilności, ale jest ignorowany.
+    Opcjonalnie date_from/date_to (ISO 'YYYY-MM-DD' lub date) ograniczają raport
+    do wskazanego okresu zamiast ostatnich 'days' dni.
     Zwraca listę słowników pogrupowanych per terapeuta.
     """
     since = (datetime.now(TZ) - timedelta(days=days)).date()
     today = datetime.now(TZ).date()
+    if date_from and date_to:
+        since = date_from if isinstance(date_from, date) else datetime.strptime(str(date_from), '%Y-%m-%d').date()
+        until = date_to if isinstance(date_to, date) else datetime.strptime(str(date_to), '%Y-%m-%d').date()
+        if until < since:
+            until = since
+        today = until + timedelta(days=1)
     params = {'fid': firma_id, 'since': since, 'today': today}
     status_cond = ""
 
@@ -17629,6 +17637,159 @@ def dziennik_missing_entries():
         print(f"❌ Błąd pobierania brakujących wpisów dziennika: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/dziennik/zestawienie', methods=['GET'])
+@login_required
+def dziennik_zestawienie():
+    """
+    Zestawienie dziennika zajęć za określony okres.
+    Parametry: ?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD (domyślnie ostatnie 7 dni).
+    Admin i sekretariat widzą wszystkich terapeutów; zwykły terapeuta tylko siebie.
+    """
+    full_view = bool(current_user and (current_user.is_admin or current_user.is_secretariat))
+    own_therapist_id = getattr(current_user, 'therapist_id', None) if current_user else None
+    if not full_view and not own_therapist_id:
+        if not current_user.has_permission('dziennik'):
+            return jsonify({'error': 'Brak uprawnie\u0144 do zestawienia dziennika.'}), 403
+        return jsonify({'error': 'Brak uprawnie\u0144 \u2014 Twoje konto nie jest powi\u0105zane z terapeut\u0105.'}), 403
+
+    def _parse_date(value, field_name):
+        try:
+            return datetime.strptime(str(value), '%Y-%m-%d').date()
+        except (TypeError, ValueError):
+            raise ValueError(f'Nieprawidłowa data w polu {field_name} \u2014 użyj formatu RRRR-MM-DD.')
+
+    try:
+        date_from = _parse_date(request.args.get('date_from') or (datetime.now(TZ) - timedelta(days=7)).strftime('%Y-%m-%d'), 'date_from')
+        date_to = _parse_date(request.args.get('date_to') or datetime.now(TZ).strftime('%Y-%m-%d'), 'date_to')
+    except ValueError as ve:
+        return jsonify({'error': str(ve)}), 400
+    if date_to < date_from:
+        date_from, date_to = date_to, date_from
+    until_excl = date_to + timedelta(days=1)
+    firma_id = session.get('firma_id', 1)
+
+    try:
+        missing = _find_missing_journal_entries(firma_id, 7, date_from=date_from, date_to=date_to)
+
+        with engine.connect() as conn:
+            entries_rows = conn.execute(text("""
+                SELECT d.therapist_id, COUNT(*) AS cnt
+                FROM dziennik d
+                WHERE d.firma_id = :fid
+                  AND d.data >= :since
+                  AND d.data < :until
+                GROUP BY d.therapist_id
+            """), {'fid': firma_id, 'since': date_from, 'until': until_excl}).mappings().all()
+
+            expected_slots = conn.execute(text("""
+                SELECT ss.therapist_id,
+                       COUNT(DISTINCT (ss.therapist_id, (ss.starts_at AT TIME ZONE 'Europe/Warsaw')::date, ss.client_id)) AS cnt
+                FROM schedule_slots ss
+                WHERE ss.firma_id = :fid
+                  AND ss.kind = 'therapy'
+                  AND ss.therapist_id IS NOT NULL
+                  AND ss.client_id IS NOT NULL
+                  AND (ss.starts_at AT TIME ZONE 'Europe/Warsaw')::date >= :since
+                  AND (ss.starts_at AT TIME ZONE 'Europe/Warsaw')::date < :until
+                GROUP BY ss.therapist_id
+            """), {'fid': firma_id, 'since': date_from, 'until': until_excl}).mappings().all()
+
+            expected_tus = conn.execute(text("""
+                SELECT g.therapist_id,
+                       COUNT(DISTINCT (g.therapist_id, ts.session_date, a.client_id)) AS cnt
+                FROM tus_sessions ts
+                JOIN tus_groups g ON g.id = ts.group_id
+                JOIN tus_session_attendance a ON a.session_id = ts.id
+                WHERE ts.firma_id = :fid
+                  AND ts.firma_id = g.firma_id
+                  AND g.therapist_id IS NOT NULL
+                  AND LOWER(a.status) IN ('obecny', 'spóźniony')
+                  AND ts.session_date >= :since
+                  AND ts.session_date < :until
+                GROUP BY g.therapist_id
+            """), {'fid': firma_id, 'since': date_from, 'until': until_excl}).mappings().all()
+
+        entries_map = {r['therapist_id']: int(r['cnt']) for r in entries_rows}
+        expected_map = {}
+        for r in list(expected_slots) + list(expected_tus):
+            expected_map[r['therapist_id']] = expected_map.get(r['therapist_id'], 0) + int(r['cnt'])
+
+        missing_map = {t['therapist_id']: t for t in missing}
+        all_ids = set(missing_map) | set(expected_map) | set(entries_map)
+        if not full_view:
+            all_ids = {tid for tid in all_ids if tid == own_therapist_id}
+
+        therapists_out = []
+        total_expected = total_entries = total_missing = 0
+        for tid in all_ids:
+            m = missing_map.get(tid)
+            expected = expected_map.get(tid, 0)
+            entries = entries_map.get(tid, 0)
+            synthetic = bool(m and m['missing'] and m['missing'][0].get('slot_id') is None and m['missing'][0].get('date') is None)
+            missing_items = [] if synthetic else (m['missing'] if m else [])
+            missing_count = len(missing_items)
+            if synthetic:
+                missing_items = [{
+                    'slot_id': None, 'date': None, 'client_id': None,
+                    'client_name': 'BRAK JAKIEGOKOLWIEK wpisu w dzienniku w tym okresie'
+                }]
+                missing_count = 1
+            total_expected += expected
+            total_entries += entries
+            total_missing += missing_count
+            therapists_out.append({
+                'therapist_id': tid,
+                'therapist_name': (m or {}).get('therapist_name'),
+                'email': (m or {}).get('email'),
+                'expected': expected,
+                'entries': entries,
+                'missing_count': missing_count,
+                'synthetic': synthetic,
+                'missing': missing_items
+            })
+
+        names = {}
+        if all_ids:
+        # uzupełnij nazwiska terapeutów, których nie było w wyniku braków
+            with engine.connect() as conn:
+                name_rows = conn.execute(text(
+                    "SELECT id, full_name, COALESCE(email, '') AS email FROM therapists WHERE firma_id = :fid"),
+                    {'fid': firma_id}
+                ).mappings().all()
+            names = {r['id']: r for r in name_rows}
+        for t in therapists_out:
+            if not t['therapist_name'] and t['therapist_id'] in names:
+                t['therapist_name'] = names[t['therapist_id']]['full_name']
+                t['email'] = names[t['therapist_id']]['email']
+
+        therapists_out.sort(key=lambda t: (t['therapist_name'] or '', t['therapist_id']))
+        return jsonify({
+            'date_from': date_from.isoformat(),
+            'date_to': date_to.isoformat(),
+            'full_view': full_view,
+            'totals': {
+                'therapists': len(therapists_out),
+                'expected': total_expected,
+                'entries': total_entries,
+                'missing': total_missing
+            },
+            'therapists': therapists_out
+        }), 200
+    except Exception as e:
+        print(f"\u274c Błąd zestawienia dziennika: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/raport/zestawienie')
+@login_required
+def raport_zestawienie_page():
+    if not (current_user.is_admin or current_user.is_secretariat or current_user.has_permission('dziennik')):
+        flash('Brak uprawnie\u0144 do zestawienia dziennika.')
+        return redirect(url_for('main_index'))
+    return render_template('raport_zestawienie.html', is_admin=current_user.is_admin, is_secretariat=current_user.is_secretariat)
 
 
 @app.route('/api/admin/journal-debug', methods=['GET'])
