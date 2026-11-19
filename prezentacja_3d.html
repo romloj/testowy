@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedSystem Ai Pro 1.5 - Prezentacja 3D Interaktywna</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            overflow: hidden;
+            background: #090d16;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+        }
+        
+        canvas {
+            display: block;
+        }
+        
+        #info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(12px);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            max-width: 400px;
+            z-index: 100;
+        }
+        
+        #info-panel h1 {
+            font-size: 18px;
+            color: #38bdf8;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        #info-panel h2 {
+            font-size: 14px;
+            color: #10b981;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        
+        #info-panel p {
+            font-size: 13px;
+            color: #cbd5e1;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+        
+        #slide-indicator {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(12px);
+            padding: 15px 30px;
+            border-radius: 25px;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            z-index: 100;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        #slide-indicator button {
+            background: rgba(56, 189, 248, 0.2);
+            color: #94a3b8;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        
+        #slide-indicator button:hover {
+            background: rgba(56, 189, 248, 0.4);
+            color: #fff;
+        }
+        
+        #slide-indicator button.active {
+            background: #38bdf8;
+            color: #fff;
+        }
+        
+        #slide-indicator span {
+            color: #94a3b8;
+            font-size: 13px;
+        }
+        
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #090d16;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+            z-index: 1000;
+            transition: opacity 0.5s;
+        }
+        
+        #loading.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .loader {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(56, 189, 248, 0.3);
+            border-top-color: #38bdf8;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(12px);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            z-index: 100;
+            font-size: 12px;
+            color: #94a3b8;
+        }
+        
+        #instructions p {
+            margin: 5px 0;
+        }
+        
+        #instructions strong {
+            color: #38bdf8;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div class="loader"></div>
+        <p>Ładowanie prezentacji 3D...</p>
+    </div>
+    
+    <div id="info-panel">
+        <h1>MedSystem Ai Pro 1.5</h1>
+        <h2 id="slide-title">Strona tytułowa</h2>
+        <p id="slide-description">System Wspomagania Badania ADOS-2</p>
+    </div>
+    
+    <div id="slide-indicator">
+        <button id="prev-btn" title="Poprzedni slajd">← Poprzedni</button>
+        <span id="slide-counter">1 / 10</span>
+        <button id="next-btn" title="Następny slajd">Następny →</button>
+    </div>
+    
+    <div id="instructions">
+        <p><strong>Sterowanie:</strong></p>
+        <p>🖱️ Kliknij na slajd → następny</p>
+        <p>← → Przyciski nawigacji</p>
+        <p>🖱️ Obracaj kamerą (LPM)</p>
+        <p>📱 Scroll → Zoom</p>
+    </div>
+
+    <!-- Three.js CDN - TYLKO JEDNA INSTANCJA -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <script>
+        // ============================================
+        // KONFIGURACJA
+        // ============================================
+        
+        const CONFIG = {
+            colors: {
+                primary: 0x38bdf8,
+                secondary: 0x10b981,
+                accent: 0xffffff,
+                background: 0x090d16,
+                card: 0x0f172a,
+                text: 0xcbd5e1
+            },
+            camera: {
+                fov: 60,
+                near: 0.1,
+                far: 1000,
+                position: { x: 0, y: 2, z: 8 }
+            },
+            slideDistance: 10, // Odległość między slajdami
+            presenterPosition: { x: -4, y: 0, z: -3 } // Pozycja prezenter
+        };
+        
+        // ============================================
+        // ZMIENNE GLOBALNE
+        // ============================================
+        
+        let scene, camera, renderer, controls;
+        let presenter, slides = [];
+        let currentSlideIndex = 0;
+        let clock = new THREE.Clock();
+        let isAnimating = false;
+        
+        // ============================================
+        // SLIDE DATA (treści slajdów)
+        // ============================================
+        
+        const SLIDES = [
+            {
+                title: "Strona tytułowa",
+                subtitle: "System Wspomagania Badania ADOS-2",
+                description: "Inteligentne wsparcie certyfikowanej diagnostyki ADOS-2 — połączenie widzenia komputerowego, analizy akustycznej mowy i pełnej zgodności z RODO.",
+                content: [
+                    "MedSystem Ai Pro 1.5",
+                    "Fundacja Na Wzgórzu",
+                    "Zespół Kliniczno-Technologiczny",
+                    "psychologdladzieci.com.pl"
+                ],
+                color: 0x38bdf8
+            },
+            {
+                title: "Architektura Rozwiązania",
+                subtitle: "Technologie i Moduły",
+                description: "Kompleksowa platforma łącząca zaawansowane technologie AI z praktycznym zastosowaniem klinicznym.",
+                content: [
+                    "MediaPipe & Analiza F0",
+                    "Śledzenie twarzy i gestów",
+                    "Separacja głosu diagnosty",
+                    "Algorytmy SA / RRB / CSS"
+                ],
+                color: 0x10b981
+            },
+            {
+                title: "Moduł 1: ADOS-2",
+                subtitle: "Automatyzacja Badania",
+                description: "Pełna automatyzacja procesu badania ADOS-2 z precyzyjną analizą zachowań.",
+                content: [
+                    "Widzenie komputerowe",
+                    "Analiza akustyczna",
+                    "Separacja głosów",
+                    "Rekordowanie sesji"
+                ],
+                color: 0x6366f1
+            },
+            {
+                title: "Moduł 2: Algorytmy",
+                subtitle: "Deterministyczna Analiza",
+                description: "Zaawansowane algorytmy wyliczające progi odcięcia dla wszystkich modułów ADOS-2.",
+                content: [
+                    "Moduł T (Toddler)",
+                    "Moduł 1",
+                    "Moduł 2",
+                    "Moduł 3",
+                    "Moduł 4"
+                ],
+                color: 0xf59e0b
+            },
+            {
+                title: "Moduł 3: Raporty",
+                subtitle: "Generowanie Dokumentacji",
+                description: "Automatyczne generowanie raportów i dokumentacji zgodnych ze standardami.",
+                content: [
+                    "Raport PDF",
+                    "Eksport do Excel",
+                    "Wizualizacja danych",
+                    "Archiwizacja"
+                ],
+                color: 0x8b5cf6
+            },
+            {
+                title: "Moduł 4: Panel",
+                subtitle: "Interfejs Użytkownika",
+                description: "Intuicyjny panel do zarządzania badaniami, pacjentami i raportami.",
+                content: [
+                    "Dashboard",
+                    "Historia pacjentów",
+                    "Statystyki",
+                    "Ustawienia"
+                ],
+                color: 0xec4899
+            },
+            {
+                title: "Innowacyjność",
+                subtitle: "Przewaga Konkurencyjna",
+                description: "Unikalne cechy wyróżniające MedSystem Ai Pro na rynku.",
+                content: [
+                    "Pełna automatyzacja",
+                    "Precyzja diagnostyczna",
+                    "Zgodność z RODO",
+                    "Integracja z systemami"
+                ],
+                color: 0x06b6d4
+            },
+            {
+                title: "Bezpieczeństwo",
+                subtitle: "Ochrona Danych",
+                description: "Pełna ochrona danych pacjentów i zgodność z przepisami.",
+                content: [
+                    "Szyfrowanie danych",
+                    "Autoryzacja dwuetapowa",
+                    "Audit log",
+                    "Backup automatyczny"
+                ],
+                color: 0x10b981
+            },
+            {
+                title: "Model Biznesowy",
+                subtitle: "Oferta i Cennik",
+                description: "Elastyczne modele licencyjne dostosowane do potrzeb klienta.",
+                content: [
+                    "Licencja roczna",
+                    "Licencja instytucjonalna",
+                    "Model SaaS",
+                    "Wsparcie techniczne"
+                ],
+                color: 0x38bdf8
+            },
+            {
+                title: "Podsumowanie",
+                subtitle: "Korzyści i Następne Kroki",
+                description: "MedSystem Ai Pro 1.5 - Przyszłość diagnostyki ADOS-2.",
+                content: [
+                    "Zapraszamy do współpracy",
+                    "psychologdladzieci.com.pl",
+                    "Fundacja Na Wzgórzu",
+                    "Gotowość wdrożeniowa"
+                ],
+                color: 0x6366f1
+            }
+        ];
+        
+        // ============================================
+        // INICJALIZACJA
+        // ============================================
+        
+        function init() {
+            console.log('Inicjalizacja prezentacji 3D...');
+            
+            // Scena
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(CONFIG.colors.background);
+            scene.fog = new THREE.Fog(CONFIG.colors.background, 15, 50);
+            
+            // Kamera
+            camera = new THREE.PerspectiveCamera(
+                CONFIG.camera.fov,
+                window.innerWidth / window.innerHeight,
+                CONFIG.camera.near,
+                CONFIG.camera.far
+            );
+            camera.position.set(
+                CONFIG.camera.position.x,
+                CONFIG.camera.position.y,
+                CONFIG.camera.position.z
+            );
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
+            
+            // DODAJ DO BODY
+            document.body.appendChild(renderer.domElement);
+            
+            // Kontrolki orbit
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.screenSpacePanning = false;
+            controls.maxPolarAngle = Math.PI / 2 - 0.1;
+            controls.minDistance = 5;
+            controls.maxDistance = 30;
+            controls.update();
+            
+            // Kamera patrzy na środek sceny
+            camera.lookAt(0, 0, 0);
+            
+            // Oświetlenie
+            setupLights();
+            
+            // Środowisko
+            createEnvironment();
+            
+            // Prezenter
+            createPresenter();
+            
+            // Slajdy
+            createSlides();
+            
+            // Obsługa zdarzeń
+            setupEventListeners();
+            
+            // Zakończenie ładowania
+            setTimeout(() => {
+                document.getElementById('loading').classList.add('hidden');
+            }, 1000);
+            
+            console.log('Prezentacja 3D zainicjalizowana pomyślnie!');
+        }
+        
+        // ============================================
+        // OŚWIETLENIE
+        // ============================================
+        
+        function setupLights() {
+            // Światło ambient
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+            scene.add(ambientLight);
+            
+            // Światło główne
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 20, 10);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 100;
+            directionalLight.shadow.camera.left = -50;
+            directionalLight.shadow.camera.right = 50;
+            directionalLight.shadow.camera.top = 50;
+            directionalLight.shadow.camera.bottom = -50;
+            scene.add(directionalLight);
+            
+            // Światło niebieskie (akcent)
+            const blueLight = new THREE.PointLight(0x38bdf8, 1, 30);
+            blueLight.position.set(-10, 5, -10);
+            scene.add(blueLight);
+            
+            // Światło zielone (akcent)
+            const greenLight = new THREE.PointLight(0x10b981, 1, 30);
+            greenLight.position.set(10, 5, -10);
+            scene.add(greenLight);
+            
+            // Światło dla prezenter
+            const presenterLight = new THREE.SpotLight(0xffffff, 1, 20);
+            presenterLight.position.set(-4, 10, -3);
+            presenterLight.angle = Math.PI / 4;
+            presenterLight.penumbra = 0.5;
+            presenterLight.castShadow = true;
+            scene.add(presenterLight);
+        }
+        
+        // ============================================
+        // ŚRODOWISKO (Sala Prezentacyjna)
+        // ============================================
+        
+        function createEnvironment() {
+            // Podłoga
+            const floorGeometry = new THREE.PlaneGeometry(100, 100);
+            const floorMaterial = new THREE.MeshStandardMaterial({
+                color: 0x0f172a,
+                roughness: 0.9,
+                metalness: 0.1
+            });
+            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            scene.add(floor);
+            
+            // Ściana tylna (ekran)
+            const wallGeometry = new THREE.PlaneGeometry(80, 30);
+            const wallMaterial = new THREE.MeshStandardMaterial({
+                color: 0x020617,
+                roughness: 0.8,
+                metalness: 0.2
+            });
+            const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+            wall.position.set(0, 15, -40);
+            scene.add(wall);
+            
+            // Dekoracyjne elementy
+            createDecorations();
+        }
+        
+        // ============================================
+        // DEKORACJE
+        // ============================================
+        
+        function createDecorations() {
+            // Kolumny po bokach
+            for (let i = -1; i <= 1; i += 2) {
+                const columnGeometry = new THREE.CylinderGeometry(0.5, 0.5, 20, 8);
+                const columnMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x1e293b,
+                    roughness: 0.7,
+                    metalness: 0.3
+                });
+                const column = new THREE.Mesh(columnGeometry, columnMaterial);
+                column.position.set(i * 30, 10, -35);
+                column.castShadow = true;
+                scene.add(column);
+            }
+            
+            // Cząsteczki światła
+            const particleCount = 300;
+            const particles = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            
+            for (let i = 0; i < particleCount; i++) {
+                positions[i * 3] = (Math.random() - 0.5) * 100;
+                positions[i * 3 + 1] = Math.random() * 20;
+                positions[i * 3 + 2] = (Math.random() - 0.5) * 100 - 20;
+            }
+            
+            particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            
+            const particleMaterial = new THREE.PointsMaterial({
+                size: 0.2,
+                color: 0x38bdf8,
+                transparent: true,
+                opacity: 0.6,
+                sizeAttenuation: true
+            });
+            
+            const particleSystem = new THREE.Points(particles, particleMaterial);
+            scene.add(particleSystem);
+        }
+        
+        // ============================================
+        // PREZENTER (Asystent)
+        // ============================================
+        
+        function createPresenter() {
+            const group = new THREE.Group();
+            group.position.set(
+                CONFIG.presenterPosition.x,
+                CONFIG.presenterPosition.y,
+                CONFIG.presenterPosition.z
+            );
+            group.castShadow = true;
+            scene.add(group);
+            
+            // Ciało
+            const bodyGeometry = new THREE.CylinderGeometry(0.4, 0.5, 1.8, 16);
+            const bodyMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                roughness: 0.7
+            });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.9;
+            body.castShadow = true;
+            group.add(body);
+            
+            // Głowa
+            const headGeometry = new THREE.SphereGeometry(0.35, 16, 16);
+            const headMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffd4a3,
+                roughness: 0.8
+            });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = 1.75;
+            head.castShadow = true;
+            group.add(head);
+            
+            // Ubranie (kitel/biały strój)
+            const coatGeometry = new THREE.CylinderGeometry(0.45, 0.55, 1.6, 16);
+            const coatMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                roughness: 0.5,
+                metalness: 0.1
+            });
+            const coat = new THREE.Mesh(coatGeometry, coatMaterial);
+            coat.position.y = 0.8;
+            group.add(coat);
+            
+            // Ręce
+            const armGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.8, 8);
+            const armMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffd4a3,
+                roughness: 0.8
+            });
+            
+            // Lewa ręka
+            const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+            leftArm.position.set(-0.5, 1.4, 0);
+            leftArm.rotation.z = Math.PI / 6;
+            group.add(leftArm);
+            
+            // Prawa ręka (do wskazywania)
+            const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+            rightArm.position.set(0.5, 1.4, 0);
+            rightArm.rotation.z = -Math.PI / 6;
+            rightArm.name = 'pointing-arm';
+            group.add(rightArm);
+            
+            // Nogi
+            const legGeometry = new THREE.CylinderGeometry(0.15, 0.2, 0.8, 8);
+            const legMaterial = new THREE.MeshStandardMaterial({
+                color: 0x1e293b,
+                roughness: 0.7
+            });
+            
+            const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+            leftLeg.position.set(-0.2, 0.4, 0);
+            group.add(leftLeg);
+            
+            const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+            rightLeg.position.set(0.2, 0.4, 0);
+            group.add(rightLeg);
+            
+            // Buty
+            const shoeGeometry = new THREE.BoxGeometry(0.25, 0.1, 0.35);
+            const shoeMaterial = new THREE.MeshStandardMaterial({
+                color: 0x000000,
+                roughness: 0.8
+            });
+            
+            const leftShoe = new THREE.Mesh(shoeGeometry, shoeMaterial);
+            leftShoe.position.set(-0.2, 0.1, 0.15);
+            group.add(leftShoe);
+            
+            const rightShoe = new THREE.Mesh(shoeGeometry, shoeMaterial);
+            rightShoe.position.set(0.2, 0.1, 0.15);
+            group.add(rightShoe);
+            
+            // Wskaźnik laserowy (opcjonalny)
+            const pointerGeometry = new THREE.ConeGeometry(0.02, 0.5, 8);
+            const pointerMaterial = new THREE.MeshStandardMaterial({
+                color: 0xff0000,
+                emissive: 0xff0000,
+                emissiveIntensity: 0.5
+            });
+            const pointer = new THREE.Mesh(pointerGeometry, pointerMaterial);
+            pointer.position.set(0.5, 1.4, -0.4);
+            pointer.rotation.x = Math.PI / 2;
+            pointer.visible = false;
+            pointer.name = 'pointer';
+            group.add(pointer);
+            
+            presenter = group;
+            console.log('Prezenter utworzony:', presenter);
+        }
+        
+        // ============================================
+        // SLAJDY (Plansze do klikania)
+        // ============================================
+        
+        function createSlides() {
+            const slideCount = SLIDES.length;
+            const startX = -(slideCount - 1) * CONFIG.slideDistance / 2;
+            
+            for (let i = 0; i < slideCount; i++) {
+                const slide = createSlide(SLIDES[i], i, startX);
+                slides.push(slide);
+            }
+            
+            // Aktywuj pierwszy slajd
+            showSlide(0);
+        }
+        
+        function createSlide(data, index, startX) {
+            const group = new THREE.Group();
+            const xPos = startX + index * CONFIG.slideDistance;
+            
+            group.position.set(xPos, 3, -10);
+            group.name = `slide-${index}`;
+            group.userData = { index: index, data: data };
+            scene.add(group);
+            
+            // Tło slajdu
+            const bgGeometry = new THREE.PlaneGeometry(8, 6);
+            const bgMaterial = new THREE.MeshStandardMaterial({
+                color: data.color,
+                transparent: true,
+                opacity: 0.85,
+                roughness: 0.3,
+                metalness: 0.5,
+                side: THREE.DoubleSide
+            });
+            const bg = new THREE.Mesh(bgGeometry, bgMaterial);
+            bg.name = 'slide-bg';
+            group.add(bg);
+            
+            // Ramka slajdu
+            const frameGeometry = new THREE.BoxGeometry(8.1, 6.1, 0.1);
+            const frameMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                roughness: 0.5,
+                metalness: 0.8
+            });
+            const frame = new THREE.Mesh(frameGeometry, frameMaterial);
+            frame.position.z = -0.06;
+            group.add(frame);
+            
+            // Tytuł slajdu
+            createText3D(data.title, group, { x: 0, y: 2.5, z: 0.1 }, 0.3, 0xffffff);
+            
+            // Podtytuł
+            createText3D(data.subtitle, group, { x: 0, y: 2, z: 0.1 }, 0.2, 0xcbd5e1);
+            
+            // Treść (pierwsze 4 linie)
+            for (let j = 0; j < Math.min(4, data.content.length); j++) {
+                createText3D(data.content[j], group, { x: 0, y: 1.2 - j * 0.5, z: 0.1 }, 0.15, 0xcbd5e1);
+            }
+            
+            // Numer slajdu
+            createText3D(`Slajd ${index + 1} / ${SLIDES.length}`, group, { x: 0, y: -2.5, z: 0.1 }, 0.12, 0x64748b);
+            
+            // Dodaj interakcję (klikalny)
+            bg.userData = { index: index, clickable: true };
+            
+            return group;
+        }
+        
+        // ============================================
+        // TEKST 3D
+        // ============================================
+        
+        function createText3D(text, parent, position, size, color) {
+            const group = new THREE.Group();
+            group.position.copy(position);
+            parent.add(group);
+            
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                
+                // Pomijaj spacje i znaki specjalne
+                if (char === ' ' || char === '·' || char === '•' || char === '−') {
+                    continue;
+                }
+                
+                const charGeometry = new THREE.BoxGeometry(size * 0.6, size, size * 0.15);
+                const charMaterial = new THREE.MeshStandardMaterial({
+                    color: color,
+                    roughness: 0.4,
+                    metalness: 0.6
+                });
+                const charMesh = new THREE.Mesh(charGeometry, charMaterial);
+                charMesh.position.x = (i - text.length / 2) * size * 0.65;
+                group.add(charMesh);
+            }
+        }
+        
+        // ============================================
+        // NAWIGACJA
+        // ============================================
+        
+        function showSlide(index) {
+            if (index < 0 || index >= slides.length) return;
+            
+            // Ukryj wszystkie slajdy
+            slides.forEach(slide => {
+                slide.visible = false;
+            });
+            
+            // Pokaż wybrany slajd
+            slides[index].visible = true;
+            
+            // Aktualizuj informacje
+            const slideData = SLIDES[index];
+            document.getElementById('slide-title').textContent = slideData.title;
+            document.getElementById('slide-description').textContent = slideData.description;
+            document.getElementById('slide-counter').textContent = `${index + 1} / ${slides.length}`;
+            
+            // Aktualizuj przyciski
+            document.getElementById('prev-btn').disabled = index === 0;
+            document.getElementById('next-btn').disabled = index === slides.length - 1;
+            
+            // Ustaw aktywny przycisk
+            document.querySelectorAll('#slide-indicator button').forEach((btn, i) => {
+                btn.classList.toggle('active', i === index);
+            });
+            
+            // Animuj prezenter (wskazuje na slajd)
+            animatePresenterToSlide(index);
+            
+            // Zapamiętaj obecny slajd
+            currentSlideIndex = index;
+            
+            // Przesuń kamerę do slajdu
+            const slide = slides[index];
+            const targetPosition = new THREE.Vector3(
+                slide.position.x,
+                4,
+                -5
+            );
+            
+            // Animacja kamery
+            isAnimating = true;
+            const startPosition = camera.position.clone();
+            let progress = 0;
+            
+            const animateCamera = () => {
+                progress += 0.05;
+                if (progress >= 1) {
+                    progress = 1;
+                    isAnimating = false;
+                }
+                
+                camera.position.lerpVectors(startPosition, targetPosition, progress);
+                camera.lookAt(slide.position.x, 3, -10);
+                controls.target.set(slide.position.x, 3, -10);
+                controls.update();
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animateCamera);
+                }
+            };
+            
+            animateCamera();
+        }
+        
+        // ============================================
+        // ANIMACJA PREZENTER
+        // ============================================
+        
+        function animatePresenterToSlide(slideIndex) {
+            if (!presenter) return;
+            
+            const slide = slides[slideIndex];
+            const targetPosition = new THREE.Vector3(
+                slide.position.x - 4,
+                0,
+                -3
+            );
+            
+            // Animuj pozycję prezenter
+            const startPosition = presenter.position.clone();
+            let progress = 0;
+            
+            const pointingArm = presenter.getObjectByName('pointing-arm');
+            const pointer = presenter.getObjectByName('pointer');
+            
+            const animatePresenter = () => {
+                progress += 0.1;
+                if (progress >= 1) {
+                    progress = 1;
+                }
+                
+                presenter.position.lerpVectors(startPosition, targetPosition, progress);
+                
+                // Animuj rękę (wskazywanie)
+                if (pointingArm) {
+                    const armProgress = Math.sin(progress * Math.PI) * 0.3;
+                    pointingArm.rotation.z = -Math.PI / 4 + armProgress;
+                }
+                
+                // Pokaż/ukryj wskaźnik
+                if (pointer) {
+                    pointer.visible = progress > 0.5;
+                }
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animatePresenter);
+                }
+            };
+            
+            animatePresenter();
+        }
+        
+        // ============================================
+        // OBSŁUGA ZDARZEŃ
+        // ============================================
+        
+        function setupEventListeners() {
+            // Zmiana rozmiaru okna
+            window.addEventListener('resize', onWindowResize);
+            
+            // Przyciski nawigacji
+            document.getElementById('prev-btn').addEventListener('click', () => {
+                if (!isAnimating) {
+                    showSlide(currentSlideIndex - 1);
+                }
+            });
+            
+            document.getElementById('next-btn').addEventListener('click', () => {
+                if (!isAnimating) {
+                    showSlide(currentSlideIndex + 1);
+                }
+            });
+            
+            // Kliknięcie na slajd
+            renderer.domElement.addEventListener('click', onClick, false);
+            
+            // Obsługa klawiszy
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'ArrowLeft' && !isAnimating) {
+                    showSlide(currentSlideIndex - 1);
+                } else if (event.key === 'ArrowRight' && !isAnimating) {
+                    showSlide(currentSlideIndex + 1);
+                }
+            });
+        }
+        
+        function onClick(event) {
+            if (isAnimating) return;
+            
+            // Sprawdź, czy kliknięto na slajd
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+            
+            // Oblicz pozycję myszy
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            // Ustaw raycaster
+            raycaster.setFromCamera(mouse, camera);
+            
+            // Sprawdź intersekcje
+            const intersects = raycaster.intersectObjects(scene.children, true);
+            
+            for (let i = 0; i < intersects.length; i++) {
+                const obj = intersects[i].object;
+                
+                // Sprawdź, czy to tło slajdu
+                if (obj.name === 'slide-bg' && obj.parent && obj.parent.userData.clickable) {
+                    const slideIndex = obj.parent.userData.index;
+                    showSlide(slideIndex);
+                    break;
+                }
+            }
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        // ============================================
+        // ANIMACJA (LOOP)
+        // ============================================
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const delta = clock.getDelta();
+            
+            if (controls) {
+                controls.update();
+            }
+            
+            // Delikatna animacja slajdów
+            slides.forEach((slide, index) => {
+                if (slide.visible) {
+                    slide.rotation.y = Math.sin(Date.now() * 0.001 + index) * 0.01;
+                }
+            });
+            
+            renderer.render(scene, camera);
+        }
+        
+        // ============================================
+        // START
+        // ============================================
+        
+        console.log('Czekam na załadowanie DOM...');
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM załadowany. Inicjuję prezentację 3D...');
+            init();
+            animate();
+        });
+    </script>
+</body>
+</html>
