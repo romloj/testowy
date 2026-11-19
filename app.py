@@ -17431,23 +17431,16 @@ def _parse_statuses(value, default=None):
 
 def _find_missing_journal_entries(firma_id, days, statuses=None):
     """
-    Znajduje odbyte zajęcia (schedule_slots, kind='therapy') bez wpisu w dzienniku
-    (dziennik.data = dzień zajęć). Gdy 'statuses' jest puste, liczone są WSZYSTKIE
-    odbyte zajęcia (każdy status poza 'cancelled') — zajęcia przeszłe często pozostają
-    ze statusem 'planned', więc filtrowanie po 'done' pomijało część osób.
+    Znajduje przeszłe zajęcia (schedule_slots, kind='therapy') bez wpisu w dzienniku
+    (dziennik.data = dzień zajęć). Status zajęć jest ignorowany — dziennik nie zależy
+    od statusu sesji; liczone są wszystkie zaplanowane w przeszłości zajęcia.
+    Parametr 'statuses' pozostaje w sygnaturze dla kompatybilności, ale jest ignorowany.
     Zwraca listę słowników pogrupowanych per terapeuta.
     """
     since = (datetime.now(TZ) - timedelta(days=days)).date()
     today = datetime.now(TZ).date()
-    status_list = _parse_statuses(statuses)
     params = {'fid': firma_id, 'since': since, 'today': today}
-    if status_list:
-        placeholders = ', '.join(f':st{i}' for i in range(len(status_list)))
-        status_cond = f"AND ss.status IN ({placeholders})"
-        for i, s in enumerate(status_list):
-            params[f'st{i}'] = s
-    else:
-        status_cond = "AND ss.status != 'cancelled'"
+    status_cond = ""
 
     sql = text(f"""
         SELECT ss.id AS slot_id,
@@ -18131,7 +18124,6 @@ def _get_missing_journal_entries_for_firma(firma_id):
                  AND d.data = (s.starts_at AT TIME ZONE 'Europe/Warsaw')::date
                 WHERE s.firma_id = :fid
                   AND s.kind     = 'therapy'
-                  AND s.status  != 'cancelled'
                   AND s.therapist_id IS NOT NULL
                   AND d.id IS NULL
                   AND s.starts_at >= (NOW() - INTERVAL '14 days')
@@ -18346,7 +18338,6 @@ def inject_journal_warning():
                 FROM schedule_slots s
                 WHERE s.therapist_id = :tid
                   AND s.kind = 'therapy'
-                  AND s.status != 'cancelled'
                   AND s.starts_at < NOW()
                   AND s.starts_at >= NOW() - INTERVAL '14 days'
                   AND NOT EXISTS (
