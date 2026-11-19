@@ -13620,15 +13620,36 @@ def save_general_journal_entry():
     if not client_id:
         return jsonify({'error': 'Brak ID klienta'}), 400
 
+    firma_id = session.get('firma_id', 1)
+
     try:
         saved_id = None
 
         with session_scope() as db_session:
-            # 1. Tworzenie obiektu Z PRZYPISANIEM DO FUNDACJI
+            # 1. Ustalenie właściwego ID terapeuty (therapists.id, NIE users.id)
+            resolved_therapist_id = None
+            payload_tid = payload.get('therapist_id')
+            if payload_tid:
+                try:
+                    payload_tid = int(payload_tid)
+                    valid = db_session.query(Therapist.id).filter(
+                        Therapist.id == payload_tid,
+                        Therapist.firma_id == firma_id
+                    ).first()
+                    if valid:
+                        resolved_therapist_id = payload_tid
+                except (TypeError, ValueError):
+                    resolved_therapist_id = None
+            if resolved_therapist_id is None and getattr(current_user, 'therapist_id', None):
+                resolved_therapist_id = int(current_user.therapist_id)
+            if resolved_therapist_id is None:
+                return jsonify({'error': 'Nie można ustalić terapeuty dla wpisu — konto nie jest powiązane z terapeutą. Poproś administratora o powiązanie konta w sekcji „Role i Użytkownicy”.'}), 400
+
+            # 2. Tworzenie obiektu Z PRZYPISANIEM DO FUNDACJI
             new_entry = JournalEntry(
-                firma_id=session.get('firma_id', 1), # <--- KLUCZOWA POPRAWKA
+                firma_id=firma_id,
                 client_id=int(client_id),
-                therapist_id=payload.get('therapist_id') or session.get('user_id'),
+                therapist_id=resolved_therapist_id,
                 data=payload.get('data'),
                 temat=payload.get('temat', '').strip(),
                 cele=payload.get('cele', '').strip(),
@@ -17702,6 +17723,61 @@ def journal_debug():
     safe('zajecia_indywidualne_7dni_wg_statusu', q_sloty_statusy)
     safe('zajecia_tus_7dni', q_tus)
     return jsonify(out), 200
+
+
+@app.post('/api/admin/journal-repair')
+@login_required
+@admin_required
+def journal_repair_therapist_ids():
+    """
+    Naprawa historycznych wpisów dziennika, w których w kolumnie dziennik.therapist_id
+    zapisano ID konta użytkownika (users.id) zamiast ID terapeuty (therapists.id).
+    Remapping tylko dla wierszy, których wartość NIE jest istniejącym ID terapeuty
+    w tym podmiocie, a konto użytkownika ma powiązanie therapist_id.
+    """
+    firma_id = session.get('firma_id', 1)
+
+    try:
+        with engine.begin() as conn:
+            wrong = conn.execute(text("""
+                SELECT d.id AS entry_id,
+                       d.therapist_id AS stored_tid,
+                       u.therapist_id AS proper_tid,
+                       u.username
+                FROM dziennik d
+                JOIN users u ON u.id = d.therapist_id
+                WHERE d.firma_id = :fid
+                  AND u.firma_id = :fid
+                  AND u.therapist_id IS NOT NULL
+                  AND NOT EXISTS (
+                      SELECT 1 FROM therapists t
+                      WHERE t.id = d.therapist_id AND t.firma_id = :fid
+                  )
+            """), {'fid': firma_id}).mappings().all()
+
+            for r in wrong:
+                conn.execute(text(
+                    "UPDATE dziennik SET therapist_id = :tid, updated_at = NOW() WHERE id = :eid"
+                ), {'tid': int(r['proper_tid']), 'eid': int(r['entry_id'])})
+
+        return jsonify({
+            'success': True,
+            'firma_id': firma_id,
+            'repaired': len(wrong),
+            'details': [
+                {
+                    'entry_id': int(r['entry_id']),
+                    'old_therapist_id': int(r['stored_tid']),
+                    'new_therapist_id': int(r['proper_tid']),
+                    'username': r['username']
+                }
+                for r in wrong
+            ]
+        }), 200
+    except Exception as e:
+        print(f"❌ Błąd naprawy dziennika: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/dziennik/remind-therapists', methods=['POST'])
